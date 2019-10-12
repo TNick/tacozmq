@@ -5,6 +5,7 @@ import taco.constants
 import taco.filesystem
 import taco.commands
 from taco.apis import post_routes
+import platform
 import re
 import os
 import uuid
@@ -65,17 +66,50 @@ def index():
 @bottle.route('/browselocaldirs/')
 @bottle.route('/browselocaldirs/<browse_path:path>')
 def index(browse_path="/"):
-    if browse_path == "": browse_path = "/"
-    browse_path = "/" + browse_path
-    browse_path = unicode(browse_path)
-    contents = os.listdir(browse_path)
+    browse_path = str(browse_path)
+    if platform.system() != 'Windows':
+        base_dir = '/'
+        if browse_path == "":
+            browse_path = base_dir
+        elif base_dir != base_dir:
+            browse_path = base_dir + browse_path
+    else:
+        try:
+            base_dir = os.environ['HOME']
+            if not os.path.isdir(base_dir):
+                logging.debug("%s does not exist", base_dir)
+                base_dir = os.environ['HOMEDRIVE'] + os.environ['HOMEPATH']
+                if not os.path.isdir(base_dir):
+                    logging.debug("%s does not exist", base_dir)
+                    base_dir = os.environ['PUBLIC']
+                    if not os.path.isdir(base_dir):
+                        logging.debug("%s does not exist", base_dir)
+                        from pathlib import Path
+                        base_dir = str(Path.home())
+                        if not os.path.isdir(base_dir):
+                            raise RuntimeError("Cannot find a path to present")
+
+            if browse_path == "":
+                browse_path = base_dir
+            else:
+                browse_path = os.path.join(base_dir, browse_path)
+        except Exception:
+            browse_path = ""
+    try:
+        logging.debug("Listing directories in %s", browse_path)
+        contents = os.listdir(browse_path)
+    except (FileNotFoundError, PermissionError):
+        contents = []
+
     final_contents = []
     for item in contents:
         try:
-            if os.path.isdir(os.path.join(browse_path, item)): final_contents.append(item)
-        except:
+            if os.path.isdir(os.path.join(browse_path, item)):
+                final_contents.append(item)
+        except Exception:
             continue
     final_contents.sort()
+
     return json.dumps(final_contents)
 
 
