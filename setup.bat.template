@@ -1,0 +1,91 @@
+@echo off
+:: ===========================================================================
+:: This file is a helper for Windows platforms. It is intended
+:: to be called in a console to prepare the environment:
+::
+::    call setup.bat
+::
+:: It is not enough to rename setup.bat.template to setup.bat;
+:: at the very least the USERNAME and COMPUTERNAME should be changed.
+:: MYPYTHON may also need to be changed to a full path.
+::
+:: The script:
+::  - clears all environment variables and sets a limited set;
+::    as setup.bat is not committed to the repository, you can add, modify 
+::    or remove, as required;
+::  - checks the presence of a virtual environment in venv and
+::    virtualenv directories and, if not found, creates one in venv;
+::  - activates the virtual environment in venv or virtualenv;
+::  - checks to see if setup.py was run in the context of the virtual
+::    environment and, if not, calls it with develop option.
+::
+:: ===========================================================================
+
+
+echo ==== CLEARING ENVIRONMENT ====
+for /f "tokens=1* delims==" %%a in ('set') do (
+echo %%a=%%b
+set %%a=
+)
+echo ==== ENVIRONMENT CLEARED ====
+
+
+:: Variables that you may want to change
+set MYPYTHON=python
+set USERNAME=YourNameShouldGoRightInHere
+set COMPUTERNAME=YourComputersNameShouldGoRightInHere
+set PROCESSOR_ARCHITECTURE=AMD64
+set PROCESSOR_IDENTIFIER=Intel64 Family 6 Model 142 Stepping 9, GenuineIntel
+set PROCESSOR_LEVEL=6
+set PROCESSOR_REVISION=8e09
+set NUMBER_OF_PROCESSORS=4
+
+:: Variables that are usually fine this way.
+set SystemDrive=C:
+set HOMEDRIVE=%SystemDrive%
+set SystemRoot=%SystemDrive%\WINDOWS
+set ALLUSERSPROFILE=%SystemDrive%\ProgramData
+set APPDATA=C:\Users\%USERNAME%\AppData\Roaming
+set ComSpec=%SystemRoot%\system32\cmd.exe
+set CommonProgramFiles(x86)=%SystemDrive%\Program Files (x86)\Common Files
+set CommonProgramFiles=%SystemDrive%\Program Files\Common Files
+set CommonProgramW6432=%SystemDrive%\Program Files\Common Files
+set HOMEPATH=\Users\%USERNAME%
+set LOCALAPPDATA=%SystemDrive%\Users\%USERNAME%\AppData\Local
+set OS=Windows_NT
+set PATHEXT=.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC;.RB;.RBW;.CPL
+set PUBLIC=%SystemDrive%\Users\Public
+set ProgramData=%SystemDrive%\ProgramData
+set ProgramFiles=%SystemDrive%\Program Files
+set TEMP=%SystemDrive%\Users\%USERNAME%\AppData\Local\Temp
+set TMP=%TEMP%
+set USERDOMAIN=%COMPUTERNAME%
+set USERDOMAIN_ROAMINGPROFILE=%COMPUTERNAME%
+set USERPROFILE=%SystemDrive%\Users\%USERNAME%
+set PATH=%SystemRoot%;%SystemRoot%\System32
+
+echo ==== ENVIRONMENT REBUILDED ====
+
+
+IF EXIST venv\NUL GOTO done_venv_pth
+IF EXIST virtualenv\NUL GOTO done_venv_pth
+"%MYPYTHON%" -m venv venv
+:done_venv_pth
+
+IF EXIST keys\NUL GOTO done_keys_pth
+md keys
+:done_keys_pth
+
+IF EXIST certstore\NUL GOTO done_certstore_pth
+md certstore
+:done_certstore_pth
+
+IF EXIST "venv\Scripts\activate.bat" call "venv\Scripts\activate.bat"
+IF EXIST "virtualenv\Scripts\activate.bat" call "virtualenv\Scripts\activate.bat"
+
+
+IF EXIST "venv\Lib\site-packages\TacoZMQ.egg-link" GOTO done_setup
+IF EXIST "virtualenv\Lib\site-packages\TacoZMQ.egg-link" GOTO done_setup
+python -m pip install --upgrade pip
+python .\setup.py develop
+:done_setup
