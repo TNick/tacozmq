@@ -5,3 +5,7 @@ keys/*
 certstore/*
 *.txt
 zmq/*
+.idea/*
+setup.bat
+venv/*
+virtualenv/*
