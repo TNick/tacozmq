@@ -1,27 +1,28 @@
 import uuid
 import taco.constants
 import sys
+
 if sys.version_info > (3, 0):
     unicode = str
 
+default_settings_kv = {
+    "Download Location": "downloads/",
+    "Nickname": "Your Nickname Here",
+    "Application Port": 5440,
+    "Application IP": "0.0.0.0",
+    "Web Port": 5340,
+    "Web IP": "127.0.0.1",
+    "Download Limit": 50,
+    "Upload Limit": 50,
+    "Local UUID": unicode(uuid.uuid4().hex),
+    "TacoNET Certificates Store": "certstore/"
+}
 
-default_settings_kv = {}
-default_settings_kv["Download Location"] = "downloads/"
-default_settings_kv["Nickname"] = "Your Nickname Here"
-default_settings_kv["Application Port"] = 5440
-default_settings_kv["Application IP"] = "0.0.0.0"
-default_settings_kv["Web Port"] = 5340
-default_settings_kv["Web IP"] = "127.0.0.1"
-default_settings_kv["Download Limit"] = 50
-default_settings_kv["Upload Limit"] = 50
-default_settings_kv["Local UUID"] = unicode(uuid.uuid4().hex)
-default_settings_kv["TacoNET Certificates Store"] = "certstore/"
-
-default_peers_kv = {}
-default_peers_kv["enabled"] = False
-default_peers_kv["hostname"] = "127.0.0.1"
-default_peers_kv["port"] = "9001"
-default_peers_kv["localnick"] = "Local Nickname"
-default_peers_kv["dynamic"] = False
-default_peers_kv["clientkey"] = ""
-default_peers_kv["serverkey"] = ""
+default_peers_kv = {
+    "enabled": False,
+    "hostname": "127.0.0.1",
+    "port": "9001",
+    "localnick": "Local Nickname",
+    "dynamic": False,
+    "clientkey": "", "serverkey": ""
+}
