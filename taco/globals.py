@@ -3,7 +3,7 @@ import taco.constants
 import logging
 import os
 import uuid
-import Queue
+
 
 settings_lock  = threading.Lock()
 settings = {}

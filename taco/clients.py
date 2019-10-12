@@ -7,18 +7,21 @@ import taco.globals
 import taco.constants
 import taco.commands
 import os
-import Queue
 import socket
+import sys
 import random
-import msgpack
+if sys.version_info < (3, 0):
+  from Queue import Queue
+else:
+  from queue import Queue
 
 class TacoClients(threading.Thread):
   def __init__(self):
     threading.Thread.__init__(self)
 
-    self.stop  = threading.Event() 
-    self.sleep = threading.Event() 
-    
+    self.stop  = threading.Event()
+    self.sleep = threading.Event()
+
     self.status_lock = threading.Lock()
     self.status = ""
     self.status_time = -1
@@ -29,7 +32,7 @@ class TacoClients(threading.Thread):
     self.next_rollcall = {}
     self.client_connect_time = {}
     self.client_reconnect_mod = {}
- 
+
     self.client_last_reply_time = {}
     self.client_last_reply_time_lock = threading.Lock()
 
@@ -38,7 +41,7 @@ class TacoClients(threading.Thread):
     self.connect_block_time = 0
 
     self.file_request_time = time.time()
-    
+
   def set_client_last_reply(self,peer_uuid):
     #logging.debug("Got Reply from: " + peer_uuid)
     self.client_reconnect_mod[peer_uuid] = taco.constants.CLIENT_RECONNECT_MIN
@@ -51,7 +54,7 @@ class TacoClients(threading.Thread):
       if peer_uuid in self.client_last_reply_time:
         return self.client_last_reply_time[peer_uuid]
     return -1
-  
+
   def set_status(self,text,level=0):
     if   level==1: logging.info(text)
     elif level==0: logging.debug(text)
@@ -60,27 +63,27 @@ class TacoClients(threading.Thread):
     with self.status_lock:
       self.status = text
       self.status_time = time.time()
-  
+
   def get_status(self):
     with self.status_lock:
-      return (self.status,self.status_time)     
+      return (self.status,self.status_time)
 
   def run(self):
     self.set_status("Client Startup")
     self.set_status("Creating zmq Contexts",1)
-    clientctx = zmq.Context() 
+    clientctx = zmq.Context()
     self.set_status("Starting zmq ThreadedAuthenticator",1)
     #clientauth = zmq.auth.ThreadedAuthenticator(clientctx)
     clientauth = ThreadAuthenticator(clientctx)
     clientauth.start()
-    
+
     with taco.globals.settings_lock:
       publicdir  = os.path.normpath(os.path.abspath(taco.globals.settings["TacoNET Certificates Store"] + "/"  + taco.globals.settings["Local UUID"] + "/public/"))
       privatedir = os.path.normpath(os.path.abspath(taco.globals.settings["TacoNET Certificates Store"] + "/"  + taco.globals.settings["Local UUID"] + "/private/"))
 
     self.set_status("Configuring Curve to use publickey dir:" + publicdir)
     clientauth.configure_curve(domain='*', location=publicdir)
-    
+
     poller = zmq.Poller()
     while not self.stop.is_set():
       #logging.debug("PRE")
@@ -94,7 +97,7 @@ class TacoClients(threading.Thread):
         with taco.globals.settings_lock: self.max_download_rate = taco.globals.settings["Download Limit"] * taco.constants.KB
         self.chunk_request_rate = float(taco.constants.FILESYSTEM_CHUNK_SIZE) / float(self.max_download_rate)
         #logging.debug(str((self.max_download_rate,taco.constants.FILESYSTEM_CHUNK_SIZE,self.chunk_request_rate)))
-        self.connect_block_time = time.time() 
+        self.connect_block_time = time.time()
         with taco.globals.settings_lock:
           for peer_uuid in taco.globals.settings["Peers"].keys():
             if taco.globals.settings["Peers"][peer_uuid]["enabled"]:
@@ -120,10 +123,10 @@ class TacoClients(threading.Thread):
                   self.clients[peer_uuid].connect("tcp://" + ip_of_client + ":" + str(taco.globals.settings["Peers"][peer_uuid]["port"]))
                   self.next_rollcall[peer_uuid] = time.time()
 
-                  with taco.globals.high_priority_output_queue_lock:   taco.globals.high_priority_output_queue[peer_uuid]   = Queue.Queue()
-                  with taco.globals.medium_priority_output_queue_lock: taco.globals.medium_priority_output_queue[peer_uuid] = Queue.Queue()
-                  with taco.globals.low_priority_output_queue_lock:    taco.globals.low_priority_output_queue[peer_uuid]    = Queue.Queue()
-                  with taco.globals.file_request_output_queue_lock:    taco.globals.file_request_output_queue[peer_uuid]    = Queue.Queue()
+                  with taco.globals.high_priority_output_queue_lock:   taco.globals.high_priority_output_queue[peer_uuid]   = Queue()
+                  with taco.globals.medium_priority_output_queue_lock: taco.globals.medium_priority_output_queue[peer_uuid] = Queue()
+                  with taco.globals.low_priority_output_queue_lock:    taco.globals.low_priority_output_queue[peer_uuid]    = Queue()
+                  with taco.globals.file_request_output_queue_lock:    taco.globals.file_request_output_queue[peer_uuid]    = Queue()
 
                   poller.register(self.clients[peer_uuid],zmq.POLLIN)
 
@@ -152,9 +155,9 @@ class TacoClients(threading.Thread):
             self.sleep.set()
             with taco.globals.upload_limiter_lock: taco.globals.upload_limiter.add(len(data))
 
-        #filereq q, aka the download throttle 
+        #filereq q, aka the download throttle
         if time.time() >= self.file_request_time:
-          self.file_request_time = time.time() 
+          self.file_request_time = time.time()
           with taco.globals.file_request_output_queue_lock:
             if not taco.globals.file_request_output_queue[peer_uuid].empty():
               with taco.globals.download_limiter_lock: download_rate = taco.globals.download_limiter.get_rate()
@@ -215,7 +218,7 @@ class TacoClients(threading.Thread):
           self.set_status("Stopping client: " + peer_uuid + " -- " + " and ".join(self.error_msg),2)
           poller.unregister(self.clients[peer_uuid])
           self.clients[peer_uuid].close(0)
-          del self.clients[peer_uuid]          
+          del self.clients[peer_uuid]
           del self.client_timeout[peer_uuid]
           with taco.globals.high_priority_output_queue_lock:    del taco.globals.high_priority_output_queue[peer_uuid]
           with taco.globals.medium_priority_output_queue_lock:  del taco.globals.medium_priority_output_queue[peer_uuid]
@@ -223,13 +226,13 @@ class TacoClients(threading.Thread):
           with taco.globals.file_request_output_queue_lock:     del taco.globals.file_request_output_queue[peer_uuid]
           self.client_reconnect_mod[peer_uuid] = min(self.client_reconnect_mod[peer_uuid] + taco.constants.CLIENT_RECONNECT_MOD,taco.constants.CLIENT_RECONNECT_MAX)
           self.client_connect_time[peer_uuid] = time.time() + self.client_reconnect_mod[peer_uuid]
-          
 
-        
+
+
     self.set_status("Terminating Clients")
     for peer_uuid in self.clients.keys():
       self.clients[peer_uuid].close(0)
     self.set_status("Stopping zmq ThreadedAuthenticator")
-    clientauth.stop() 
+    clientauth.stop()
     clientctx.term()
-    self.set_status("Clients Exit")    
+    self.set_status("Clients Exit")

@@ -9,7 +9,11 @@ import re,time
 import os,uuid
 import logging
 import json
+import sys
 from collections import defaultdict
+
+if sys.version_info > (3, 0):
+  unicode = str
 
 #static content
 @bottle.route('/static/<filename:path>')
@@ -186,7 +190,7 @@ def index():
         request = taco.commands.Request_Share_Listing(peer_uuid,sharedir,browse_result_uuid)
         taco.globals.Add_To_Output_Queue(peer_uuid,request,2)
         return json.dumps({"sharedir":sharedir,"result":browse_result_uuid})
-        
+
   if bottle.request.json[u"action"] == u"peerstatus":
     output = {}
     with taco.globals.settings_lock:
@@ -237,7 +241,7 @@ def index():
             nickname = taco.globals.settings["Nickname"]
           else:
             nickname = puuid
-          if puuid==localuuid: 
+          if puuid==localuuid:
             output_chat.append([0,nickname,puuid,thetime,msg])
           else:
             output_chat.append([1,nickname,puuid,thetime,msg])
@@ -248,11 +252,11 @@ def index():
       if len(bottle.request.json[u"data"]) > 0:
         taco.commands.Request_Chat(bottle.request.json[u"data"])
         return "1"
-  
+
   if bottle.request.json[u"action"] == u"chatuuid":
     with taco.globals.chat_uuid_lock:
       return json.dumps([taco.globals.chat_uuid])
-   
+
   if bottle.request.json[u"action"] == u"peersave":
     if type(bottle.request.json[u"data"]) == type([]):
       if len(bottle.request.json[u"data"]) >= 0:
@@ -291,8 +295,8 @@ def index(browse_path="/"):
       continue
   final_contents.sort()
   return json.dumps(final_contents)
-      
-  
+
+
 
 @bottle.route('/get/<what>')
 def getData(what):

@@ -3,18 +3,22 @@ import taco.constants
 import taco.settings
 import msgpack
 import logging
+import sys
 import time
 import uuid
-import Queue
+if sys.version_info < (3, 0):
+  from Queue import Queue
+else:
+  from queue import Queue
 
 def Create_Request(command=taco.constants.NET_GARBAGE,data=""):
-  with taco.globals.settings_lock: 
+  with taco.globals.settings_lock:
     localuuid = taco.globals.settings["Local UUID"]
   response = {taco.constants.NET_IDENT:localuuid,taco.constants.NET_REQUEST:command,taco.constants.NET_DATABLOCK:data}
   return response
 
 def Create_Reply(command=taco.constants.NET_GARBAGE,data=""):
-  with taco.globals.settings_lock: 
+  with taco.globals.settings_lock:
     localuuid = taco.globals.settings["Local UUID"]
   reply = {taco.constants.NET_IDENT:localuuid,taco.constants.NET_REPLY:command,taco.constants.NET_DATABLOCK:data}
   return reply
@@ -43,7 +47,7 @@ def Proccess_Request(packed):
     if unpacked[taco.constants.NET_REQUEST] == taco.constants.NET_REQUEST_GET_FILE_CHUNK:        return (IDENT,Reply_Get_File_Chunk(IDENT,unpacked[taco.constants.NET_DATABLOCK]))
     if unpacked[taco.constants.NET_REQUEST] == taco.constants.NET_REQUEST_GIVE_FILE_CHUNK:       return (IDENT,Reply_Give_File_Chunk(IDENT,unpacked[taco.constants.NET_DATABLOCK]))
 
-  logging.debug("Unknown Request") 
+  logging.debug("Unknown Request")
   return ("0",msgpack.packb(reply))
 
 def Process_Reply(peer_uuid,packed):
@@ -97,7 +101,7 @@ def Reply_Rollcall():
         peers_i_can_talk_to.append(peer_uuid)
   reply = Create_Reply(taco.constants.NET_REPLY_ROLLCALL,[taco.globals.settings["Nickname"],taco.globals.settings["Local UUID"]] + peers_i_can_talk_to)
   return msgpack.packb(reply)
- 
+
 def Process_Reply_Rollcall(peer_uuid,unpacked):
   requested_peers = []
   #logging.warning(str(unpacked))
@@ -123,9 +127,9 @@ def Process_Reply_Rollcall(peer_uuid,unpacked):
   if len(requested_peers) > 0:
     return Request_Certs(requested_peers)
   return ""
-    
-        
- 
+
+
+
 def Request_Certs(peer_uuids):
   request =  Create_Request(taco.constants.NET_REQUEST_CERTS,peer_uuids)
   return msgpack.packb(request)
@@ -157,10 +161,10 @@ def Process_Reply_Certs(peer_uuid,unpacked):
             taco.globals.settings["Peers"][peerid]["localnick"] = ""
             taco.globals.settings["Peers"][peerid]["nickname"] = nickname
             taco.settings.Save_Settings(False)
-      
+
 
   return response
- 
+
 
 def Request_Share_Listing(peer_uuid,sharedir,share_listing_uuid):
   with taco.globals.share_listings_i_care_about_lock:
@@ -179,14 +183,14 @@ def Reply_Share_Listing(peer_uuid,datablock):
 
   #logging.debug("Got a share listing request from: " + peer_uuid + " for: " + sharedir)
   with taco.globals.share_listing_requests_lock:
-    if not peer_uuid in taco.globals.share_listing_requests: taco.globals.share_listing_requests[peer_uuid] = Queue.Queue()
+    if not peer_uuid in taco.globals.share_listing_requests: taco.globals.share_listing_requests[peer_uuid] = Queue()
     taco.globals.share_listing_requests[peer_uuid].put((sharedir,shareuuid))
     taco.globals.filesys.sleep.set()
 
   return msgpack.packb(reply)
 
 def Request_Share_Listing_Results(sharedir,results_uuid,results):
-  request =  Create_Request(taco.constants.NET_REQUEST_SHARE_LISTING_RESULTS,{"sharedir":sharedir,"results_uuid":results_uuid,"results":results}) 
+  request =  Create_Request(taco.constants.NET_REQUEST_SHARE_LISTING_RESULTS,{"sharedir":sharedir,"results_uuid":results_uuid,"results":results})
   return msgpack.packb(request)
 
 def Reply_Share_Listing_Result(peer_uuid,datablock):
@@ -200,7 +204,7 @@ def Reply_Share_Listing_Result(peer_uuid,datablock):
   except:
     reply = Create_Reply(taco.constants.NET_REPLY_SHARE_LISTING_RESULTS,0)
     return msgpack.packb(reply)
-  
+
   #logging.debug("Got share listing RESULTS from: " + peer_uuid + " for: " + sharedir)
   with taco.globals.share_listings_lock:
     taco.globals.share_listings[(peer_uuid,sharedir)] = [time.time(),results]
@@ -230,13 +234,13 @@ def Reply_Get_File_Chunk(peer_uuid,datablock):
 def Process_Reply_Get_File_Chunk(peer_uuid,datablock):
   try:
     status     = datablock["status"]
-    chunk_uuid = datablock["chunk_uuid"] 
+    chunk_uuid = datablock["chunk_uuid"]
   except:
     return ""
   taco.globals.filesys.chunk_requests_ack_queue.put((peer_uuid,chunk_uuid))
   taco.globals.filesys.sleep.set()
   return ""
-    
+
 def Request_Give_File_Chunk(data,chunk_uuid):
   request = Create_Request(taco.constants.NET_REQUEST_GIVE_FILE_CHUNK,{"data":data,"chunk_uuid":chunk_uuid})
   return msgpack.packb(request)

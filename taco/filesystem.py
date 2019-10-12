@@ -2,12 +2,16 @@ import os
 import logging
 import time
 import threading
-import Queue
-import random
+import sys
 import taco.constants
 import taco.globals
 import uuid
-from collections import defaultdict
+
+if sys.version_info < (3, 0):
+  from Queue import Queue
+else:
+  from queue import Queue
+  unicode = str
 
 if os.name=='nt':
   import ctypes
@@ -67,11 +71,11 @@ class TacoFilesystemManager(threading.Thread):
     self.listings_lock = threading.Lock()
     self.listings = {}
 
-    self.listing_work_queue            = Queue.Queue()
-    self.listing_results_queue         = Queue.Queue()
-    self.chunk_requests_incoming_queue = Queue.Queue() 
-    self.chunk_requests_outgoing_queue = Queue.Queue() 
-    self.chunk_requests_ack_queue      = Queue.Queue() 
+    self.listing_work_queue            = Queue()
+    self.listing_results_queue         = Queue()
+    self.chunk_requests_incoming_queue = Queue()
+    self.chunk_requests_outgoing_queue = Queue()
+    self.chunk_requests_ack_queue      = Queue()
 
     self.results_to_return = []
 
@@ -81,12 +85,12 @@ class TacoFilesystemManager(threading.Thread):
     self.client_downloading_pending_chunks = {}
     self.client_downloading_requested_chunks = {}
     self.client_downloading_chunks_last_recieved = {}
-    self.client_downloading_filename = {} 
+    self.client_downloading_filename = {}
     self.files_w = {}
     self.files_r = {}
     self.files_r_last_access = {}
     self.files_w_last_access = {}
- 
+
   def add_listing(self,thetime,sharedir,dirs,files):
     with self.listings_lock:
       self.listings[sharedir] = [thetime,dirs,files]
@@ -115,7 +119,7 @@ class TacoFilesystemManager(threading.Thread):
       self.sleep.wait(0.2)
       self.sleep.clear()
       if self.stop.is_set(): break
-      
+
       #CHECK downloadq state
       if time.time() >= self.download_q_check_time:
         #self.set_status("Checking if the download q is in a good state")
@@ -129,10 +133,10 @@ class TacoFilesystemManager(threading.Thread):
             incoming = taco.globals.server.get_client_last_request(peer_uuid)
             outgoing = taco.globals.clients.get_client_last_reply(peer_uuid)
 
-            if incoming < 0 or outgoing < 0: 
+            if incoming < 0 or outgoing < 0:
               self.set_status("I have items in the download queue, but client has never been contactable: "+peer_uuid)
               continue
-            if abs(time.time() - incoming) > taco.constants.ROLLCALL_TIMEOUT or abs(time.time() - outgoing) > taco.constants.ROLLCALL_TIMEOUT: 
+            if abs(time.time() - incoming) > taco.constants.ROLLCALL_TIMEOUT or abs(time.time() - outgoing) > taco.constants.ROLLCALL_TIMEOUT:
               self.set_status("I have items in the download queue, but client has timed out rollcalls: "+peer_uuid)
               continue
 
@@ -194,11 +198,11 @@ class TacoFilesystemManager(threading.Thread):
                   del taco.globals.download_q[peer_uuid][0]
 
 
-      #send out requests for downloads 
+      #send out requests for downloads
       for peer_uuid in self.client_downloading:
         if self.client_downloading[peer_uuid] == 0: continue
         (sharedir,filename,filesize,filemod) = self.client_downloading[peer_uuid]
-        while len(self.client_downloading_pending_chunks[peer_uuid]) > 0 and len(self.client_downloading_requested_chunks[peer_uuid]) < taco.constants.FILESYSTEM_CREDIT_MAX: 
+        while len(self.client_downloading_pending_chunks[peer_uuid]) > 0 and len(self.client_downloading_requested_chunks[peer_uuid]) < taco.constants.FILESYSTEM_CREDIT_MAX:
           (chunk_uuid,file_offset) = self.client_downloading_pending_chunks[peer_uuid].pop()
           self.set_status("Credits Free:" + str((sharedir,filename,filesize,filemod,chunk_uuid,file_offset)))
           request = taco.commands.Request_Get_File_Chunk(sharedir,filename,file_offset,chunk_uuid)
@@ -206,7 +210,7 @@ class TacoFilesystemManager(threading.Thread):
           self.client_downloading_requested_chunks[peer_uuid].append(chunk_uuid)
           (time_request_sent,time_request_ack,offset) = self.client_downloading_status[peer_uuid][chunk_uuid]
           self.client_downloading_status[peer_uuid][chunk_uuid] = (time.time(),0.0,offset)
-      
+
       #check for chunk ack
       while not self.chunk_requests_ack_queue.empty():
         try:
@@ -218,12 +222,12 @@ class TacoFilesystemManager(threading.Thread):
           self.client_downloading_status[peer_uuid][chunk_uuid] = (time_request_sent,time.time(),offset)
           self.set_status("File Chunk request has been ACK'D:" + str((peer_uuid,time_request_sent,chunk_uuid)))
           self.sleep.set()
-        else: 
+        else:
           self.set_status("File Chunk request SHOULD HAVE been ACK'D:" + str((peer_uuid,time_request_sent,chunk_uuid)))
 
       #if chunk has not been ack'd in > x time or no data in > x time
       #for peer_uuid in self.client_downloading_status:
-      #  download_borked = 
+      #  download_borked =
       #  for chunk_uuid in self.client_downloading_status[peer_uuid]:
       #    (time_request_sent,time_request_ack,offset) = self.client_downloading_status[peer_uuid][chunk_uuid]
       #    if time_request_sent > 0.0 and peer_uuid in self.client_downloading:
@@ -235,13 +239,13 @@ class TacoFilesystemManager(threading.Thread):
       #  if download_borked:
       #    self.set_status("Download Borked for: "+peer_uuid)
       #    self.client_downloading[peer_uuid] = 0
-      
+
       for peer_uuid in self.client_downloading_chunks_last_recieved:
         if peer_uuid in self.client_downloading and self.client_downloading[peer_uuid] != 0:
           if abs(time.time() - self.client_downloading_chunks_last_recieved[peer_uuid]) > taco.constants.DOWNLOAD_Q_WAIT_FOR_DATA:
             self.set_status("Download Borked for: "+ peer_uuid)
             self.client_downloading[peer_uuid] = 0
-        
+
 
       #chunk data has been recieved
       while not self.chunk_requests_incoming_queue.empty():
@@ -272,7 +276,7 @@ class TacoFilesystemManager(threading.Thread):
 
       if self.stop.is_set(): break
 
-      #chunk data has been requested 
+      #chunk data has been requested
       if not self.chunk_requests_outgoing_queue.empty():
         if self.stop.is_set(): break
         try:
@@ -299,24 +303,24 @@ class TacoFilesystemManager(threading.Thread):
           taco.globals.clients.sleep.set()
 
       if self.stop.is_set(): break
-            
+
       if len(self.results_to_return) > 0:
         #self.set_status("There are results that need to be sent once they are ready")
         with self.listings_lock:
           for [peer_uuid,sharedir,shareuuid] in self.results_to_return:
             if sharedir in self.listings.keys():
-              self.set_status("RESULTS ready to send:" + str((sharedir,shareuuid))) 
+              self.set_status("RESULTS ready to send:" + str((sharedir,shareuuid)))
               request = taco.commands.Request_Share_Listing_Results(sharedir,shareuuid,self.listings[sharedir])
               taco.globals.Add_To_Output_Queue(peer_uuid,request,2)
               taco.globals.clients.sleep.set()
               self.results_to_return.remove([peer_uuid,sharedir,shareuuid])
               self.sleep.set()
-              
-                 
+
+
       if abs(time.time() - self.last_purge) > taco.constants.FILESYSTEM_CACHE_PURGE:
         #self.set_status("Purging old filesystem results")
         self.last_purge = time.time()
-        
+
         for filename in self.files_r_last_access.keys():
           if abs(time.time() - self.files_r_last_access[filename]) > taco.constants.FILESYSTEM_CACHE_TIMEOUT:
             if filename in self.files_r.keys():
@@ -328,7 +332,7 @@ class TacoFilesystemManager(threading.Thread):
         for filename in self.files_w_last_access.keys():
           if abs(time.time() - self.files_w_last_access[filename]) > taco.constants.FILESYSTEM_CACHE_TIMEOUT:
             if filename in self.files_w.keys():
-              self.set_status("Closing a file for writing due to inactivity:" + filename)       
+              self.set_status("Closing a file for writing due to inactivity:" + filename)
               self.files_w[filename].close()
               del self.files_w[filename]
             del self.files_w_last_access[filename]
@@ -373,7 +377,7 @@ class TacoFilesystemManager(threading.Thread):
         self.set_status("Processing a worker result: " + sharedir)
         self.add_listing(thetime,sharedir,dirs,files)
         self.sleep.set()
-      
+
     self.set_status("Killing Workers")
     for i in self.workers:
       i.stop.set()
@@ -429,7 +433,7 @@ class TacoFilesystemWorker(threading.Thread):
           share_listing.sort()
           results = [1,time.time(),rootsharedir,share_listing,[]]
           taco.globals.filesys.listing_results_queue.put(results)
-          continue  
+          continue
         assert Is_Path_Under_A_Share(directory)
         assert os.path.isdir(directory)
       except:
@@ -455,8 +459,8 @@ class TacoFilesystemWorker(threading.Thread):
         dirs.sort()
         files.sort()
         results = [1,time.time(),rootsharedir,dirs,files]
-      except Exception,e:
-        print str(e)
+      except Exception:
+        logging.exception("Failed to obtain the list of files")
         results = [0,time.time(),rootsharedir,[],[]]
 
       taco.globals.filesys.listing_results_queue.put(results)

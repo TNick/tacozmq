@@ -1,5 +1,9 @@
 import uuid
 import taco.constants
+import sys
+if sys.version_info > (3, 0):
+    unicode = str
+
 
 default_settings_kv = {}
 default_settings_kv["Download Location"] = "downloads/"
