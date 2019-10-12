@@ -7,6 +7,8 @@ wrapped by @post_route("action"). These handlers get collected in
 `post_routes` which is then used in routes.py to handle the call.
 """
 import taco.settings
+import taco.server
+import taco.clients
 import taco.globals
 import taco.constants
 import taco.filesystem
@@ -182,8 +184,9 @@ def download_q_get(jdata):
             for peer_uuid in taco.globals.download_q:
                 for (sharedir, filename, filesize, modtime) \
                         in taco.globals.download_q[peer_uuid]:
-                    filename_incomplete = os.path.normpath(
-                        local_copy_download_directory + u"/" + filename + taco.constants.FILESYSTEM_WORKINPROGRESS_SUFFIX)
+                    filename_incomplete = os.path.normpath(os.path.join(
+                        local_copy_download_directory,
+                        filename + taco.constants.FILESYSTEM_WORKINPROGRESS_SUFFIX))
                     try:
                         current_size = os.path.getsize(filename_incomplete)
                     except:
@@ -192,7 +195,8 @@ def download_q_get(jdata):
             output = {
                 "result": taco.globals.download_q,
                 "peerinfo": peerinfo,
-                "fileinfo": fileinfo}
+                "fileinfo": fileinfo
+            }
     return output
 
 

@@ -7,9 +7,6 @@ import taco.globals
 import taco.constants
 import taco.commands
 import os
-import socket
-import random
-import msgpack
 
 
 class TacoServer(threading.Thread):
@@ -95,6 +92,7 @@ class TacoServer(threading.Thread):
         poller.register(server, zmq.POLLIN | zmq.POLLOUT)
 
         while not self.stop.is_set():
+            reply = ""
             socks = dict(poller.poll(200))
             if server in socks and socks[server] == zmq.POLLIN:
                 # self.set_status("Getting a request")

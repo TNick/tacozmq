@@ -10,8 +10,9 @@ class Speedometer(object):
     def add(self, data_len):
         current_time = time.time()
         try:
-            self.rate = (self.rate * abs(self.last - self.start) + data_len) / abs(current_time - self.start)
-        except:
+            self.rate = (self.rate * abs(self.last - self.start) + data_len) / \
+                        abs(current_time - self.start)
+        except ZeroDivisionError:
             self.rate = 0.0
         self.last = current_time
 

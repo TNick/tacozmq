@@ -49,6 +49,12 @@ medium_priority_output_queue = {}
 low_priority_output_queue = {}
 file_request_output_queue = {}
 
+server = None
+clients = None
+filesys = None
+download_limiter = None
+upload_limiter = None
+
 
 def Add_To_Output_Queue(peer_uuid, msg, priority=3):
     logging.debug("Add to " + peer_uuid + " output q @ " + str(priority))

@@ -81,13 +81,13 @@ class TacoClients(threading.Thread):
     def run_peer(self, peer_uuid, client_ctx, private_dir, poller):
         peer_data = taco.globals.settings["Peers"][peer_uuid]
         # init some defaults
-        if not peer_uuid in self.client_reconnect_mod:
+        if peer_uuid not in self.client_reconnect_mod:
             self.client_reconnect_mod[
                 peer_uuid] = CLIENT_RECONNECT_MIN
-        if not peer_uuid in self.client_connect_time:
+        if peer_uuid not in self.client_connect_time:
             self.client_connect_time[
                 peer_uuid] = time.time() + self.client_reconnect_mod[peer_uuid]
-        if not peer_uuid in self.client_timeout:
+        if peer_uuid not in self.client_timeout:
             self.client_timeout[
                 peer_uuid] = time.time() + ROLLCALL_TIMEOUT
 
@@ -281,7 +281,7 @@ class TacoClients(threading.Thread):
             self.next_request = taco.commands.Process_Reply(peer_uuid, data)
             if self.next_request != "":
                 with taco.globals.medium_priority_output_queue_lock:
-                    taco.globals.medium_priority_output_queue[peer_uuid]\
+                    taco.globals.medium_priority_output_queue[peer_uuid] \
                         .put(self.next_request)
             self.sleep.set()
             socks = dict(poller.poll(0))

@@ -8,85 +8,105 @@ import time
 
 
 def Load_Settings(needlock=True):
-    logging.debug("Started")
+    logging.debug("loading settings ...")
     save_after = False
-    if needlock: taco.globals.settings_lock.acquire()
+    if needlock:
+        taco.globals.settings_lock.acquire()
 
     try:
-        logging.debug("Loading Settings JSON")
-        taco.globals.settings = json.loads(open(taco.constants.JSON_SETTINGS_FILENAME, 'r').read())
-    except:
-        taco.globals.settings = {}
-        taco.globals.settings["Peers"] = {}
-        taco.globals.settings["Shares"] = []
+        try:
+            logging.debug("Loading Settings JSON")
+            with open(taco.constants.JSON_SETTINGS_FILENAME, 'r') as fin:
+                taco.globals.settings = json.load(fin)
+        except Exception:
+            taco.globals.settings = {"Peers": {}, "Shares": []}
 
-    logging.debug("Verifying the settings loaded from the json isn't missing any required keys")
-    for keyname in taco.defaults.default_settings_kv.keys():
-        if not keyname in taco.globals.settings:
-            taco.globals.settings[keyname] = taco.defaults.default_settings_kv[keyname]
+        logging.debug("Verifying the settings loaded from the json "
+                      "isn't missing any required keys")
+        for keyname in taco.defaults.default_settings_kv.keys():
+            if not keyname in taco.globals.settings:
+                taco.globals.settings[keyname] = \
+                    taco.defaults.default_settings_kv[keyname]
+                save_after = True
+
+        if not os.path.isdir(taco.globals.settings["TacoNET Certificates Store"]):
+            logging.debug("Making %s Certificates Store",
+                          taco.constants.APP_NAME)
+            os.makedirs(taco.globals.settings["TacoNET Certificates Store"])
+
+        logging.debug("Verifying settings share list is in correct format")
+        if not isinstance(taco.globals.settings["Shares"], list):
+            taco.globals.shares = []
             save_after = True
 
-    if not os.path.isdir(taco.globals.settings["TacoNET Certificates Store"]):
-        logging.debug("Making " + taco.constants.APP_NAME + " Certificates Store")
-        os.makedirs(taco.globals.settings["TacoNET Certificates Store"])
+        logging.debug("Verifying settings peer dict is in correct format")
+        keep_keys = []
+        for peer_uuid in taco.globals.settings["Peers"].keys():
+            peer_data = taco.globals.settings["Peers"][peer_uuid]
+            if peer_data["enabled"]:
+                Enable_Key(peer_uuid, "client", peer_data["clientkey"], False)
+                Enable_Key(peer_uuid, "server", peer_data["serverkey"], False)
+                keep_keys.append(peer_uuid + "-client.key")
+                keep_keys.append(peer_uuid + "-server.key")
+        Disable_Keys(keep_keys, False)
 
-    logging.debug("Verifying settings share list is in correct format")
-    valid_list = False
-    if type(taco.globals.settings["Shares"]) == type([]):
-        valid_list = True
+    finally:
+        if needlock:
+            taco.globals.settings_lock.release()
 
-    if not valid_list:
-        taco.globals.shares = []
-        save_after = True
-
-    logging.debug("Verifying settings peer dict is in correct format")
-    keep_keys = []
-    for peer_uuid in taco.globals.settings["Peers"].keys():
-        if taco.globals.settings["Peers"][peer_uuid]["enabled"]:
-            Enable_Key(peer_uuid, "client", taco.globals.settings["Peers"][peer_uuid]["clientkey"], False)
-            Enable_Key(peer_uuid, "server", taco.globals.settings["Peers"][peer_uuid]["serverkey"], False)
-            keep_keys.append(peer_uuid + "-client.key")
-            keep_keys.append(peer_uuid + "-server.key")
-    Disable_Keys(keep_keys, False)
-
-    if needlock: taco.globals.settings_lock.release()
-
+    logging.debug("settings loaded")
     if save_after:
-        logging.info("Settings need to be saved")
         Save_Settings()
-    logging.debug("Finished")
 
 
 def Save_Settings(needlock=True):
-    logging.debug("Started")
-    if needlock: taco.globals.settings_lock.acquire()
-    open(taco.constants.JSON_SETTINGS_FILENAME, 'w').write(json.dumps(taco.globals.settings, indent=4, sort_keys=True))
-    if needlock: taco.globals.settings_lock.release()
+    logging.debug("saving settings...")
+    if needlock:
+        taco.globals.settings_lock.acquire()
+    try:
+        with open(taco.constants.JSON_SETTINGS_FILENAME, 'w') as fout:
+            json.dump(fout, taco.globals.settings, indent=4, sort_keys=True)
+    finally:
+        if needlock:
+            taco.globals.settings_lock.release()
+    logging.debug("settings saved")
     Load_Settings(needlock)
-    logging.debug("Finished")
 
 
 def Disable_Keys(keys_to_keep, needlock=True):
     logging.debug("Disabling Peer Keys if Needed")
-    if needlock: taco.globals.settings_lock.acquire()
-    publicdir = os.path.normpath(os.path.abspath(
-        taco.globals.settings["TacoNET Certificates Store"] + "/" + taco.globals.settings["Local UUID"] + "/public/"))
-    if needlock: taco.globals.settings_lock.release()
-    if not os.path.exists(publicdir): os.makedirs(publicdir)
-    filelisting = os.listdir(os.path.normpath(os.path.abspath(publicdir)))
+    if needlock:
+        taco.globals.settings_lock.acquire()
+    try:
+        public_dir = os.path.normpath(os.path.abspath(os.path.join(
+            taco.globals.settings["TacoNET Certificates Store"],
+            taco.globals.settings["Local UUID"],
+            "public"))
+        )
+    finally:
+        if needlock:
+            taco.globals.settings_lock.release()
+
+    if not os.path.exists(public_dir):
+        os.makedirs(public_dir)
+    filelisting = os.listdir(os.path.normpath(os.path.abspath(public_dir)))
     delete_files = []
     logging.debug("Keys that will be kept: " + str(keys_to_keep))
     for filename in filelisting:
-        if filename not in keys_to_keep: delete_files.append(filename)
+        if filename not in keys_to_keep:
+            delete_files.append(filename)
 
     for file_to_delete in delete_files:
         logging.info("Deleting key: " + file_to_delete)
-        full_path = os.path.normpath(os.path.abspath(publicdir + "/" + file_to_delete))
-        if os.path.isfile(full_path): os.remove(full_path)
+        full_path = os.path.normpath(os.path.abspath(os.path.join(
+            public_dir, file_to_delete)))
+        if os.path.isfile(full_path):
+            os.remove(full_path)
 
 
-def Enable_Key(peeruuid, keytype, keystring, needlock):
-    logging.info("Enabling KEY for UUID:" + peeruuid + " -- " + keytype + " -- " + keystring)
+def Enable_Key(peer_uuid, key_type, key_string, needlock):
+    logging.info("Enabling KEY for UUID:%s -- %s -- %s",
+                 peer_uuid, key_type, key_string)
     template = """
 #   **** Saved on %s by tacozmq  ****
 #   for peer: %s
@@ -100,14 +120,21 @@ metadata
 curve
     public-key = "%s"
   """
-    template_out = template % (str(time.time()), peeruuid, keytype, keystring)
 
-    if needlock: taco.globals.settings_lock.acquire()
-    publicdir = os.path.normpath(os.path.abspath(
-        taco.globals.settings["TacoNET Certificates Store"] + "/" + taco.globals.settings["Local UUID"] + "/public/"))
-    if needlock: taco.globals.settings_lock.release()
-    location = os.path.normpath(os.path.abspath(publicdir + "/" + peeruuid + "-" + keytype + ".key"))
+    if needlock:
+        taco.globals.settings_lock.acquire()
+    public_dir = os.path.normpath(os.path.abspath(os.path.join(
+        taco.globals.settings["TacoNET Certificates Store"],
+        taco.globals.settings["Local UUID"],
+        "public")))
+    if needlock:
+        taco.globals.settings_lock.release()
+    location = os.path.normpath(os.path.abspath(os.path.join(
+        public_dir, '%s-%s.key' % (peer_uuid, key_type))))
 
-    template_out = template % (str(time.time()), peeruuid, keytype, keystring)
-    if not os.path.isdir(publicdir): os.makedirs(publicdir)
-    output = open(location, 'w').write(template_out)
+    template_out = template % (
+        str(time.time()), peer_uuid, key_type, key_string)
+    if not os.path.isdir(public_dir):
+        os.makedirs(public_dir)
+    with open(location, 'w') as fout:
+        fout.write(template_out)
