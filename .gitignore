@@ -9,3 +9,4 @@ zmq/*
 setup.bat
 venv/*
 virtualenv/*
+*.egg-info
