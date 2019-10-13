@@ -26,6 +26,7 @@ config = {
     'version': '0.3.0',
     'install_requires': [
         'argparse',
+        'appdirs',
         'pyzmq',
     ],
     'packages': find_packages(),
