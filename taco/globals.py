@@ -103,6 +103,7 @@ class TacoApp(object):
         from taco.routes import create_bottle
         self.bottle = create_bottle(self)
         self.bottle_server = None
+        self.cherry = None
 
     def start(self, host=None, port=None, debug=False, quiet=False):
         """ Starts the application. """
@@ -115,7 +116,24 @@ class TacoApp(object):
         self.bottle_server = CherryPyServer(
             host=host, port=port)
 
+        # For lack of a smarter way to do this, we monkey-patch
+        # the CherryPyWSGIServer to intercept first call to it.
+        # We then store the server instance so that we can call close()
+        # on it when a shutdown message is received.
+        from cherrypy import wsgiserver
+        original_class = [wsgiserver.CherryPyWSGIServer]
+
+        def monkey(*args, **kwargs):
+            assert original_class[0] is not None
+            result = original_class[0](*args, **kwargs)
+            self.cherry = result
+            wsgiserver.CherryPyWSGIServer = original_class[0]
+            original_class[0] = None
+            return result
+
+        wsgiserver.CherryPyWSGIServer = monkey
         try:
+
             self.bottle.run(
                 host=host,
                 port=port,
@@ -123,8 +141,14 @@ class TacoApp(object):
                 quiet=quiet,
                 debug=debug,
                 server=self.bottle_server)
-        except ShutDownException:
+            wsgiserver.CherryPyWSGIServer = monkey
+
+        except (ShutDownException, SystemExit, KeyboardInterrupt):
             pass
+        finally:
+            if original_class[0] is not None:
+                wsgiserver.CherryPyWSGIServer = original_class[0]
+        return 0
 
     def restart(self):
         """ Recreates the client and the server. """
@@ -197,7 +221,9 @@ class TacoApp(object):
 
         return 0
 
-    def proper_exit(self, signum, frame):
+    def proper_exit(self):
+        if self.server is None:
+            return
         self.stop.set()
         logging.info("Stopping Server")
         self.server.stop.set()
@@ -208,8 +234,11 @@ class TacoApp(object):
         self.filesys.stop.set()
         self.filesys.sleep.set()
         self.server.join()
+        self.server = None
         self.clients.join()
+        self.clients = None
         self.filesys.join()
+        self.filesys = None
         logging.debug("Dispatcher Stopped Successfully")
         logging.info("Clean Exit")
 
@@ -219,6 +248,6 @@ def proper_exit(signum, frame):
     logging.warning("SIGINT Detected, stopping " + taco.constants.APP_NAME)
     app = TacoApp.instance
     if app is not None:
-        app.proper_exit(signum, frame)
+        app.proper_exit()
     import sys
     sys.exit(3)

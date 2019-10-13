@@ -25,7 +25,10 @@ if sys.version_info > (3, 0):
 
 def create_bottle(app):
     result = Bottle()
-    setattr(result, 'taco_app', app)
+
+    # Sometimes the application refuses to terminate so we
+    # have some counter-measures in shut_down()
+    shutdown_counter = [5]
 
     # static content
     @result.route('/static/<filename:path>')
@@ -35,15 +38,23 @@ def create_bottle(app):
 
     # terminate
     @result.route('/shutitdown')
-    def taco_page():
-        app.proper_exit(1, 1)
+    def shut_down():
         result.close()
-
-        # TODO: Cannot seem to find a clean way to close it down
-        # Bottle hides the real server from us and does not store
-        # the instance anywhere.
-        import sys
-        sys.exit(3)
+        app.proper_exit()
+        if app.cherry is not None:
+            app.cherry.stop()
+            app.cherry = None
+        logging.debug("Completed the shutdown sequence (%d)" %
+                      shutdown_counter[0])
+        shutdown_counter[0] = shutdown_counter[0] - 1
+        if shutdown_counter[0] <= 1:
+            logging.debug("Forcing exit using sys.exit...")
+            import sys
+            sys.exit(0)
+        elif shutdown_counter[0] <= 0:
+            logging.debug("Forcing exit using os._exit...")
+            import os
+            os._exit(0)
 
     # template routes
     @result.route('/')
@@ -81,7 +92,7 @@ def create_bottle(app):
 
         action = jdata[u"action"]
         if action in post_routes:
-            result = post_routes[action](jdata)
+            result = post_routes[action](jdata, app)
             return result
 
         logging.error("action %s is not part of post routes", action)

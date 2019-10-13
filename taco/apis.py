@@ -48,13 +48,13 @@ def post_route(action):
 
 
 @post_route("apistatus")
-def api_status(jdata):
+def api_status(jdata, app):
     return {"status": 1}
 
 
 @post_route("threadstatus")
-def thread_status(jdata):
-    app = TacoApp.instance
+def thread_status(jdata, app):
+
     output = {"threads": {}}
     output["threads"]["clients"] = {}
     output["threads"]["server"] = {}
@@ -77,8 +77,7 @@ def thread_status(jdata):
 
 
 @post_route("speed")
-def speed(jdata):
-    app = TacoApp.instance
+def speed(jdata, app):
     with app.download_limiter_lock:
         down = app.download_limiter.get_rate()
     with app.upload_limiter_lock:
@@ -87,7 +86,7 @@ def speed(jdata):
 
 
 @post_route("downloadqadd")
-def download_q_add(jdata):
+def download_q_add(jdata, app):
     if isinstance(jdata[u"data"], dict):
         try:
             peer_uuid = jdata[u"data"][u"uuid"]
@@ -97,8 +96,6 @@ def download_q_add(jdata):
             filemod = float(jdata[u"data"][u"filemodtime"])
         except:
             return -1
-
-        app = TacoApp.instance
 
         with app.download_q_lock:
             logging.debug("Adding File to Download Q:" + str(
@@ -114,7 +111,7 @@ def download_q_add(jdata):
 
 
 @post_route("downloadqremove")
-def download_q_remove(jdata):
+def download_q_remove(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, dict):
         try:
@@ -125,8 +122,6 @@ def download_q_remove(jdata):
             filemod = float(data[u"filemodtime"])
         except:
             return -1
-
-        app = TacoApp.instance
 
         with app.download_q_lock:
             logging.debug("Removing File to Download Q:" + str(
@@ -144,7 +139,7 @@ def download_q_remove(jdata):
 
 
 @post_route("downloadqmove")
-def download_q_move(jdata):
+def download_q_move(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, dict):
         try:
@@ -158,8 +153,6 @@ def download_q_move(jdata):
             return -1
     else:
         return -1
-
-    app = TacoApp.instance
 
     with app.download_q_lock:
         logging.debug(
@@ -178,9 +171,7 @@ def download_q_move(jdata):
 
 
 @post_route("downloadqget")
-def download_q_get(jdata):
-    app = TacoApp.instance
-
+def download_q_get(jdata, app):
     with app.settings_lock:
         local_copy_download_directory = os.path.normpath(app.settings["Download Location"])
         with app.download_q_lock:
@@ -213,16 +204,14 @@ def download_q_get(jdata):
 
 
 @post_route("completedqclear")
-def completed_q_clear(jdata):
-    app = TacoApp.instance
+def completed_q_clear(jdata, app):
     with app.completed_q_lock:
         app.completed_q = []
     return 1
 
 
 @post_route("completedqget")
-def completed_q_get(jdata):
-    app = TacoApp.instance
+def completed_q_get(jdata, app):
     with app.settings_lock:
         with app.completed_q_lock:
             peerinfo = {}
@@ -238,17 +227,16 @@ def completed_q_get(jdata):
 
 
 @post_route("uploadqget")
-def upload_q_get(jdata):
+def upload_q_get(jdata, app):
     raise NotImplementedError
 
 
 @post_route("browseresult")
-def browse_result(jdata):
+def browse_result(jdata, app):
     output = {}
     data = jdata[u"data"]
     if isinstance(data, dict):
         if u"sharedir" in data and u"uuid" in data:
-            app = TacoApp.instance
             with app.share_listings_lock:
                 if (data[u"uuid"], data[u"sharedir"]) \
                         in app.share_listings:
@@ -260,7 +248,7 @@ def browse_result(jdata):
 
 
 @post_route("browse")
-def browse(jdata):
+def browse(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, dict):
         if u"uuid" in data and u"sharedir" in data:
@@ -279,9 +267,10 @@ def browse(jdata):
             }
     return {}
 
+
 @post_route("peerstatus")
-def peer_status(jdata):
-    app = TacoApp.instance
+def peer_status(jdata, app):
+
     output = {}
     with app.settings_lock:
         for peer_uuid in app.settings["Peers"].keys():
@@ -302,8 +291,7 @@ def peer_status(jdata):
 
 
 @post_route("settingssave")
-def settings_save(jdata):
-    app = TacoApp.instance
+def settings_save(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, list):
         if len(data) >= 0:
@@ -311,30 +299,29 @@ def settings_save(jdata):
                 logging.info("API Access: SETTINGS -- Action: SAVE")
                 for (keyname, value) in data:
                     app.settings[keyname] = value
-                app.Save_Settings(False)
+                app.store.Save_Settings(False)
                 return 1
     return -1
 
+
 @post_route("sharesave")
-def share_save(jdata):
+def share_save(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, list):
         if len(data) >= 0:
-            app = TacoApp.instance
             with app.settings_lock:
                 logging.info("API Access: SHARE -- Action: SAVE")
                 app.settings["Shares"] = []
                 for (sharename, sharelocation) in data:
                     app.settings["Shares"].append([sharename, sharelocation])
-                app.Save_Settings(False)
+                app.store.Save_Settings(False)
                 return 1
     return -1
 
 
 @post_route("getchat")
-def get_chat(jdata):
+def get_chat(jdata, app):
     output_chat = []
-    app = TacoApp.instance
     with app.settings_lock:
         localuuid = app.settings["Local UUID"]
         with app.chat_log_lock:
@@ -354,7 +341,7 @@ def get_chat(jdata):
 
 
 @post_route("sendchat")
-def send_chat(jdata):
+def send_chat(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, str) or isinstance(data, unicode):
         if len(data) > 0:
@@ -364,18 +351,16 @@ def send_chat(jdata):
 
 
 @post_route("chatuuid")
-def chat_uuid(jdata):
-    app = TacoApp.instance
+def chat_uuid(jdata, app):
     with app.chat_uuid_lock:
         return [app.chat_uuid]
 
 
 @post_route("peersave")
-def peer_save(jdata):
+def peer_save(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, list):
         if len(data) >= 0:
-            app = TacoApp.instance
             with app.settings_lock:
                 logging.info("API Access: PEER -- Action: SAVE")
                 app.settings["Peers"] = {}
@@ -389,7 +374,7 @@ def peer_save(jdata):
                         "clientkey": client_pub,
                         "serverkey": server_pub
                     }
-                app.Save_Settings(False)
-
+                app.store.Save_Settings(False)
             app.restart()
             return 1
+    return -1
