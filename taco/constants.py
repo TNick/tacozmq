@@ -41,8 +41,16 @@ KEY_GENERATION_PREFIX = "taconet"  # needs to be changed later
 
 LOOP_TOKEN_COUNT = 250
 
+# Minimum time to wait before attempting a reconnect [seconds]
 CLIENT_RECONNECT_MIN = 0
+
+# Time to add between consecutive failed reconnects [seconds]
+# - first attempt will be at t+CLIENT_RECONNECT_MIN
+# - second attempt will be at t+CLIENT_RECONNECT_MIN+CLIENT_RECONNECT_MOD
+# - and so on until we reach CLIENT_RECONNECT_MAX
 CLIENT_RECONNECT_MOD = 2
+
+# Maximum time to wait before attempting a reconnect [seconds]
 CLIENT_RECONNECT_MAX = 16
 
 FILESYSTEM_CACHE_TIMEOUT = 120
@@ -58,8 +66,13 @@ DOWNLOAD_Q_CHECK_TIME = 2
 DOWNLOAD_Q_WAIT_FOR_ACK = 30
 DOWNLOAD_Q_WAIT_FOR_DATA = 300
 
+# When a hartbeat needs to be scheduled the interval is randomly
+# picked from this interval.
 ROLLCALL_MIN = 2
 ROLLCALL_MAX = 5
+
+# The time our peers have to send a hartbeat or other communication.
+# If expires we consider the peer to be timed out. [seconds]
 ROLLCALL_TIMEOUT = ROLLCALL_MAX * 2
 
 NET_GARBAGE = "G"

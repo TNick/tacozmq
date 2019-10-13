@@ -139,8 +139,10 @@ class TacoCommands(object):
         peers_i_can_talk_to = []
         with self.app.settings_lock:
             for peer_uuid in self.app.settings["Peers"].keys():
-                if abs(self.app.clients.get_client_last_reply(
-                        peer_uuid) - time.time()) < ROLLCALL_TIMEOUT:
+                last_reply = self.app.clients.get_client_last_reply(peer_uuid)
+                # Is this peer responsive?
+                if abs(last_reply - time.time()) < ROLLCALL_TIMEOUT:
+                    # The timeout has not yet expired.
                     peers_i_can_talk_to.append(peer_uuid)
         reply = self.Create_Reply(
             NET_REPLY_ROLLCALL,

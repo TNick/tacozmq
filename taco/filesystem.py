@@ -166,12 +166,16 @@ class TacoFilesystemManager(threading.Thread):
                 "but client has never been contactable: " + peer_uuid)
             return
 
-        if abs(time.time() - incoming) > ROLLCALL_TIMEOUT or abs(
-                time.time() - outgoing) > ROLLCALL_TIMEOUT:
+        if \
+                abs(time.time() - incoming) > ROLLCALL_TIMEOUT or \
+                abs(time.time() - outgoing) > ROLLCALL_TIMEOUT:
+
             self.set_status(
                 "I have items in the download queue, "
                 "but client has timed out rollcalls: " + peer_uuid)
             return
+
+        # The peer is responsive.
 
         if len(self.app.download_q[peer_uuid]) == 0:
             self.set_status("Download Q empty for: " + peer_uuid)
