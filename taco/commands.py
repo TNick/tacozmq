@@ -5,7 +5,7 @@ Commands used by the api.
 from __future__ import unicode_literals
 from __future__ import print_function
 
-import msgpack
+from umsgpack import packb, unpackb
 import logging
 import sys
 import time
@@ -46,12 +46,12 @@ class TacoCommands(object):
     def Proccess_Request(self, packed):
         reply = self.Create_Request()
         try:
-            unpacked = msgpack.unpackb(packed)
+            unpacked = unpackb(packed)
             assert NET_DATABLOCK in unpacked
             assert NET_IDENT in unpacked
         except:
             logging.warning("Got a bad request")
-            return "0", msgpack.packb(reply)
+            return "0", packb(reply)
         if NET_REQUEST in unpacked:
             if unpacked[NET_REQUEST] == NET_REQUEST_GIVE_FILE_CHUNK:
                 if "data" in unpacked[NET_DATABLOCK]:
@@ -83,12 +83,12 @@ class TacoCommands(object):
                     IDENT, self.Reply_Give_File_Chunk(IDENT, unpacked[NET_DATABLOCK]))
 
         logging.debug("Unknown Request")
-        return "0", msgpack.packb(reply)
+        return "0", packb(reply)
 
     def Process_Reply(self, peer_uuid, packed):
         response = ""
         try:
-            unpacked = msgpack.unpackb(packed)
+            unpacked = unpackb(packed)
             assert NET_DATABLOCK in unpacked
             assert NET_IDENT in unpacked
         except:
@@ -118,7 +118,7 @@ class TacoCommands(object):
             if len(self.app.chat_log) > CHAT_LOG_MAXSIZE:
                 self.app.chat_log = self.app.chat_log[1:]
 
-        self.app.Add_To_All_Output_Queues(msgpack.packb(output_block))
+        self.app.Add_To_All_Output_Queues(packb(output_block))
 
     def Reply_Chat(self, peer_uuid, datablock):
         logging.debug(str(datablock))
@@ -129,11 +129,11 @@ class TacoCommands(object):
             if len(self.app.chat_log) > CHAT_LOG_MAXSIZE:
                 self.app.chat_log = self.app.chat_log[1:]
         reply = self.Create_Reply(NET_REPLY_CHAT, {})
-        return msgpack.packb(reply)
+        return packb(reply)
 
     def Request_Rollcall(self):
         request = self.Create_Request(NET_REQUEST_ROLLCALL, "")
-        return msgpack.packb(request)
+        return packb(request)
 
     def Reply_Rollcall(self):
         peers_i_can_talk_to = []
@@ -146,7 +146,7 @@ class TacoCommands(object):
             NET_REPLY_ROLLCALL,
             [self.app.settings["Nickname"],
              self.app.settings["Local UUID"]] + peers_i_can_talk_to)
-        return msgpack.packb(reply)
+        return packb(reply)
 
     def Process_Reply_Rollcall(self, peer_uuid, unpacked):
         requested_peers = []
@@ -178,7 +178,7 @@ class TacoCommands(object):
 
     def Request_Certs(self, peer_uuids):
         request = self.Create_Request(NET_REQUEST_CERTS, peer_uuids)
-        return msgpack.packb(request)
+        return packb(request)
 
     def Reply_Certs(self, peer_uuid, datablock):
         reply = self.Create_Reply(NET_REPLY_CERTS, {})
@@ -194,7 +194,7 @@ class TacoCommands(object):
                         peer_data[ "serverkey"],
                         peer_data["dynamic"]
                     ]
-        return msgpack.packb(reply)
+        return packb(reply)
 
     def Process_Reply_Certs(self, peer_uuid, unpacked):
         response = ""
@@ -226,7 +226,7 @@ class TacoCommands(object):
         request = self.Create_Request(
             NET_REQUEST_SHARE_LISTING,
             {"sharedir": sharedir, "results_uuid": share_listing_uuid})
-        return msgpack.packb(request)
+        return packb(request)
 
     def Reply_Share_Listing(self, peer_uuid, datablock):
         reply = self.Create_Reply(NET_REPLY_SHARE_LISTING, 1)
@@ -235,7 +235,7 @@ class TacoCommands(object):
             shareuuid = datablock["results_uuid"]
         except:
             reply[NET_DATABLOCK] = 0
-            return msgpack.packb(reply)
+            return packb(reply)
 
         # logging.debug("Got a share listing request from:
         #   " + peer_uuid + " for: " + sharedir)
@@ -246,7 +246,7 @@ class TacoCommands(object):
                 .put((sharedir, shareuuid))
             self.app.filesys.sleep.set()
 
-        return msgpack.packb(reply)
+        return packb(reply)
 
     def Request_Share_Listing_Results(self, sharedir, results_uuid, results):
         request = self.Create_Request(
@@ -256,7 +256,7 @@ class TacoCommands(object):
                 "results_uuid": results_uuid,
                 "results": results
             })
-        return msgpack.packb(request)
+        return packb(request)
 
     def Reply_Share_Listing_Result(self, peer_uuid, datablock):
         reply = self.Create_Reply(NET_REPLY_SHARE_LISTING_RESULTS, 1)
@@ -268,7 +268,7 @@ class TacoCommands(object):
                 assert shareuuid in self.app.share_listings_i_care_about
         except:
             reply = self.Create_Reply(NET_REPLY_SHARE_LISTING_RESULTS, 0)
-            return msgpack.packb(reply)
+            return packb(reply)
 
         # logging.debug("Got share listing RESULTS from: " +
         #   peer_uuid + " for: " + sharedir)
@@ -278,7 +278,7 @@ class TacoCommands(object):
         with self.app.share_listings_i_care_about_lock:
             del self.app.share_listings_i_care_about[shareuuid]
 
-        return msgpack.packb(reply)
+        return packb(reply)
 
     def Request_Get_File_Chunk(self, sharedir, filename, offset, chunk_uuid):
         request = self.Create_Request(
@@ -289,7 +289,7 @@ class TacoCommands(object):
                 "offset": offset,
                 "chunk_uuid": chunk_uuid
             })
-        return msgpack.packb(request)
+        return packb(request)
 
     def Reply_Get_File_Chunk(self, peer_uuid, datablock):
         try:
@@ -300,14 +300,14 @@ class TacoCommands(object):
         except:
             reply = self.Create_Reply(
                 NET_REPLY_GET_FILE_CHUNK, {"status": 0})
-            return msgpack.packb(reply)
+            return packb(reply)
         self.app.filesys.chunk_requests_outgoing_queue.put(
             (peer_uuid, sharedir, filename, offset, chunk_uuid))
         self.app.filesys.sleep.set()
         reply = self.Create_Reply(
             NET_REPLY_GET_FILE_CHUNK,
             {"chunk_uuid": chunk_uuid, "status": 1})
-        return msgpack.packb(reply)
+        return packb(reply)
 
     def Process_Reply_Get_File_Chunk(self, peer_uuid, datablock):
         try:
@@ -324,7 +324,7 @@ class TacoCommands(object):
         request = self.Create_Request(
             NET_REQUEST_GIVE_FILE_CHUNK,
             {"data": data, "chunk_uuid": chunk_uuid})
-        return msgpack.packb(request)
+        return packb(request)
 
     def Reply_Give_File_Chunk(self, peer_uuid, datablock):
         reply = self.Create_Reply()
@@ -332,9 +332,9 @@ class TacoCommands(object):
             chunk_uuid = datablock["chunk_uuid"]
             data = datablock["data"]
         except:
-            return msgpack.packb(reply)
+            return packb(reply)
         logging.debug("Incoming Chunk Processed")
         self.app.filesys.chunk_requests_incoming_queue.put(
             (peer_uuid, chunk_uuid, data))
         self.app.filesys.sleep.set()
-        return msgpack.packb(reply)
+        return packb(reply)

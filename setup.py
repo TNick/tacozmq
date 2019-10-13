@@ -28,7 +28,9 @@ config = {
         'argparse',
         'appdirs',
         'pyzmq',
-        'bottle'
+        'bottle',
+        'cherrypy < 9.0.0',
+        'u-msgpack-python'
     ],
     'packages': find_packages(),
     'package_data': {
