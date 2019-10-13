@@ -65,7 +65,7 @@ def Save_Settings(needlock=True):
         taco.globals.settings_lock.acquire()
     try:
         with open(taco.constants.JSON_SETTINGS_FILENAME, 'w') as fout:
-            json.dump(fout, taco.globals.settings, indent=4, sort_keys=True)
+            json.dump(taco.globals.settings, fout, indent=4, sort_keys=True)
     finally:
         if needlock:
             taco.globals.settings_lock.release()
