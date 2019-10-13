@@ -16,7 +16,7 @@ APP_TAGLINE = [
 
 APP_VERSION = 0.3
 APP_STAGE = "Beta"
-APP_AUTHOR = ["Scott Powers"]
+APP_AUTHOR = ["Scott Powers", "Nicu Tofan"]
 
 KB = 2 ** 10
 MB = 2 ** 20
