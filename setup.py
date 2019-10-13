@@ -28,6 +28,7 @@ config = {
         'argparse',
         'appdirs',
         'pyzmq',
+        'bottle'
     ],
     'packages': find_packages(),
     'package_data': {

@@ -6,10 +6,13 @@ from __future__ import unicode_literals
 from __future__ import print_function
 
 import threading
+
 import taco.constants
 import logging
 import os
 import uuid
+
+from taco.utils import ShutDownException
 
 
 class TacoApp(object):
@@ -97,16 +100,31 @@ class TacoApp(object):
         from taco.commands import TacoCommands
         self.commands = TacoCommands(self)
 
-    def start(self):
+        from taco.routes import create_bottle
+        self.bottle = create_bottle(self)
+        self.bottle_server = None
+
+    def start(self, host=None, port=None, debug=False, quiet=False):
         """ Starts the application. """
-        from taco.bottle import run
-        run(
-            host=self.settings["Web IP"],
-            port=int(self.settings["Web Port"]),
-            reloader=False,
-            quiet=True,
-            debug=True,
-            server="cherrypy")
+        if host is None:
+            host = self.settings["Web IP"]
+        if port is None:
+            port = self.settings["Web Port"]
+
+        from bottle import CherryPyServer
+        self.bottle_server = CherryPyServer(
+            host=host, port=port)
+
+        try:
+            self.bottle.run(
+                host=host,
+                port=port,
+                reloader=False,
+                quiet=quiet,
+                debug=debug,
+                server=self.bottle_server)
+        except ShutDownException:
+            pass
 
     def restart(self):
         """ Recreates the client and the server. """

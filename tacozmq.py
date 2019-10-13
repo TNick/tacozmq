@@ -65,6 +65,22 @@ def make_argument_parser():
             '%s.log' % APP_NAME),
         help='where to save the log; a single - will disable it.')
     parser.add_argument(
+        "--web-addr", default="127.0.0.1", type=str,
+        metavar="ip", action="store",
+        help="the address where the user interface will be served")
+    parser.add_argument(
+        "--web-port", default=5340, type=int,
+        metavar="port", action="store",
+        help="the port where the user interface will be served")
+    parser.add_argument(
+        "--app-addr", default=None, type=str,
+        metavar="ip", action="store",
+        help="the address used to communicate with peers")
+    parser.add_argument(
+        "--app-port", default=None, type=int,
+        metavar="port", action="store",
+        help="the port used to communicate with peers")
+    parser.add_argument(
         "--version", default=False,
         action="store_true",
         help="print program version and exit")
@@ -94,6 +110,7 @@ def setup_logging(args):
             print("ERROR! --log-level expects an integer between 1 and %d" %
                   logging.CRITICAL)
             return False
+    args.log_level = log_level
 
     # The format we're going to use in all handlers.
     fmt = logging.Formatter(
@@ -157,7 +174,12 @@ def main():
     # Start the application.
     from taco.globals import TacoApp
     app = TacoApp()
-    return app.start()
+    return app.start(
+        host=args.web_addr,
+        port=args.web_port,
+        debug=args.log_level < logging.INFO,
+        quiet=args.log_level > logging.INFO
+    )
 
 
 if __name__ == '__main__':

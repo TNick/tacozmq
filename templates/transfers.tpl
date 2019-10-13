@@ -1,10 +1,3 @@
-%import taco.globals
-%import os
-
-%taco.globals.settings_lock.acquire()
-%local_settings_copy = taco.globals.settings.copy()
-%taco.globals.settings_lock.release()
-
 %rebase templates/layout title='Transfers'
 <div class="modal fade" id="removeModal" tabindex="-1" role="dialog">
   <div class="modal-dialog modal-lg">

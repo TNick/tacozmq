@@ -15,3 +15,7 @@ def norm_path(inp):
 def norm_join(*args):
     """ Like os.path.join but also normalizes the path. """
     return norm_path(os.path.join(*args))
+
+
+class ShutDownException(Exception):
+    pass

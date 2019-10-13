@@ -1,10 +1,3 @@
-%import taco.globals
-%import os
-
-%taco.globals.settings_lock.acquire()
-%local_settings_copy = taco.globals.settings.copy()
-%taco.globals.settings_lock.release()
-
 %rebase templates/layout title='Home'
 <div class="row">
   <div class="col-md-12">
@@ -32,7 +25,7 @@
     </div>
   </div>
 </div>
-  
+
 
 <div class="row">
 <div class="col-md-12">
@@ -49,7 +42,7 @@
             <li>Last Action: <span id="serverstatus"></span> @ <span id="serverlast"></span>
           </ul>
         <li><b>Webserver:</b> Running
-          
+
       </ul>
     </div>
   </div>

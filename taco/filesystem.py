@@ -538,6 +538,7 @@ class TacoFilesystemWorker(threading.Thread):
                 assert os.path.isdir(directory)
             except Exception:
                 continue
+
             self.set_status("Filesystem Worker #" + str(self.worker_id) + " -- Get Directory Listing for: " + directory)
 
             dirs = []

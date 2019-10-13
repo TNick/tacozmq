@@ -1,10 +1,5 @@
-%import taco.globals
 %import taco.constants
 %import os
-
-%taco.globals.settings_lock.acquire()
-%local_settings_copy = taco.globals.settings.copy()
-%taco.globals.settings_lock.release()
 
 %rebase templates/layout title='Browse'
 <div class="row">
@@ -25,4 +20,4 @@
     </div>
   </div>
 </div>
-  
+

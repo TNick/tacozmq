@@ -13,6 +13,8 @@ import shutil
 import re
 from os.path import isfile
 
+from taco.utils import norm_path, norm_join
+
 
 def Init_Local_Crypto(app):
     logging.debug("Started")

@@ -1,14 +1,5 @@
-%import taco.globals
 %import os
-
-%taco.globals.settings_lock.acquire()
-%local_settings_copy = taco.globals.settings.copy()
-%taco.globals.settings_lock.release()
-
-%taco.globals.public_keys_lock.acquire()
-%local_keys_copy = taco.globals.public_keys.copy()
-%taco.globals.public_keys_lock.release()
-
+%import taco.constants
 
 %rebase templates/layout title='Settings'
 
@@ -285,7 +276,7 @@
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peernickbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The local nickname you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
                 <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Port</span>Local Nickname</span></span><input autocomplete="off" type="text" class="form-control peerlocalnick" placeholder="Local Nickname"></div>
                 <div class="advanced-options">
-                
+
                   <div class="alert alert-warning alert-dismissable alert-tweak hide peeruuidbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The UUID you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
                   <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>UUID</span></span><input autocomplete="off" type="text" class="form-control peeruuid" placeholder="UUID"></div>
                   <div class="alert alert-warning alert-dismissable alert-tweak hide peerclientbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The Client Public Key you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
@@ -325,7 +316,7 @@
 
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peerhostbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The hostname you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
                 <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Hostname or IP</span></span><input autocomplete="off" type="text" class="form-control peerhost" placeholder="External Hostname" value="{{local_settings_copy["Peers"][p_uuid]["hostname"]}}"><span class="input-group-addon">Dynamic? <input class='peerdynamic' type="checkbox" {{"checked='yes'" if local_settings_copy["Peers"][p_uuid]["dynamic"] else ""}}></input></span></div>
-                
+
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peerportbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The port you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
                 <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Port</span></span><input autocomplete="off" type="text" class="form-control peerport" placeholder="External Port" value="{{local_settings_copy["Peers"][p_uuid]["port"]}}"></div>
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peernickbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The local nickname you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
