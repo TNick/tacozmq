@@ -70,7 +70,7 @@ class TacoApp(object):
     low_priority_output_queue = {}
     file_request_output_queue = {}
 
-    def __init__(self):
+    def __init__(self, host=None, port=None):
         super(TacoApp, self).__init__()
         TacoApp.instance = self
 
@@ -86,7 +86,7 @@ class TacoApp(object):
         self.download_limiter = Speedometer()
 
         from taco.server import TacoServer
-        self.server = TacoServer(self)
+        self.server = TacoServer(self, bind_ip=host, bind_port=port)
         self.server.start()
 
         from taco.clients import TacoClients

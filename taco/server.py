@@ -17,9 +17,11 @@ from taco.utils import norm_path
 
 
 class TacoServer(threading.Thread):
-    def __init__(self, app):
+    def __init__(self, app, bind_ip, bind_port):
         threading.Thread.__init__(self)
         self.app = app
+        self.bind_ip = bind_ip
+        self.bind_port = bind_port
 
         self.stop = threading.Event()
 
@@ -66,8 +68,11 @@ class TacoServer(threading.Thread):
         serverauth.start()
 
         with self.app.settings_lock:
-            bindip = self.app.settings["Application IP"]
-            bindport = self.app.settings["Application Port"]
+            if self.bind_ip is None:
+                self.bind_ip = self.app.settings["Application IP"]
+            if self.bind_port is None:
+                self.bind_port = self.app.settings["Application Port"]
+
             localuuid = self.app.settings["Local UUID"]
             publicdir = norm_path(
                 self.app.settings["TacoNET Certificates Store"] + "/" + self.app.settings[
@@ -91,10 +96,12 @@ class TacoServer(threading.Thread):
         server.curve_publickey = server_public
 
         server.curve_server = True
-        if bindip == "0.0.0.0": bindip = "*"
-        self.set_status(
-            "Server is now listening for encrypted ZMQ connections @ " + "tcp://" + bindip + ":" + str(bindport))
-        server.bind("tcp://" + bindip + ":" + str(bindport))
+        if self.bind_ip == "0.0.0.0":
+            self.bind_ip = "*"
+        address = "tcp://%s:%d" % (self.bind_ip, self.bind_port)
+        self.set_status("Server is now listening for encrypted "
+                        "ZMQ connections @ %s" % address)
+        server.bind(address)
 
         poller = zmq.Poller()
         poller.register(server, zmq.POLLIN | zmq.POLLOUT)
@@ -108,7 +115,9 @@ class TacoServer(threading.Thread):
                 with self.app.download_limiter_lock:
                     self.app.download_limiter.add(len(data))
                 (client_uuid, reply) = self.app.commands.Proccess_Request(data)
-                if client_uuid != "0": self.set_client_last_request(client_uuid)
+                if client_uuid != "0":
+                    self.set_client_last_request(client_uuid)
+
             socks = dict(poller.poll(10))
             if server in socks and socks[server] == zmq.POLLOUT:
                 # self.set_status("Replying to a request")

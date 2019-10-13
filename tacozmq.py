@@ -173,7 +173,7 @@ def main():
 
     # Start the application.
     from taco.globals import TacoApp
-    app = TacoApp()
+    app = TacoApp(args.app_addr, args.app_port)
     return app.start(
         host=args.web_addr,
         port=args.web_port,
