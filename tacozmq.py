@@ -16,7 +16,6 @@ from appdirs import user_data_dir, user_log_dir, user_config_dir
 import random
 from datetime import datetime
 
-import taco.constants
 
 if zmq.zmq_version_info() < (4, 0):
     raise RuntimeError("Security is not supported in libzmq version < 4.0. "
@@ -145,47 +144,20 @@ def main():
         return 0
 
     # Handle signals.
-    from taco.globals import properexit
-    signal.signal(signal.SIGINT, properexit)
+    from taco.globals import proper_exit
+    signal.signal(signal.SIGINT, proper_exit)
 
     # Prepare the logger.
     if not setup_logging(args):
         return 1
 
-    import taco.routes
-    import taco.server
-    import taco.clients
-    import taco.crypto
-    import taco.settings
-    import taco.filesystem
-    import taco.limiter
-    import taco.globals
-
+    import taco.constants
     taco.constants.JSON_SETTINGS_FILENAME = args.config_file
 
-    taco.settings.Load_Settings()
-    taco.crypto.Init_Local_Crypto()
-
-    taco.globals.upload_limiter = taco.limiter.Speedometer()
-    taco.globals.download_limiter = taco.limiter.Speedometer()
-
-    taco.globals.server = taco.server.TacoServer()
-    taco.globals.server.start()
-
-    taco.globals.clients = taco.clients.TacoClients()
-    taco.globals.clients.start()
-
-    taco.globals.filesys = taco.filesystem.TacoFilesystemManager()
-    taco.globals.filesys.start()
-
-    from taco.bottle import run
-    run(
-        host=taco.globals.settings["Web IP"],
-        port=int(taco.globals.settings["Web Port"]),
-        reloader=False,
-        quiet=True,
-        debug=True,
-        server="cherrypy")
+    # Start the application.
+    from taco.globals import TacoApp
+    app = TacoApp()
+    return app.start()
 
 
 if __name__ == '__main__':

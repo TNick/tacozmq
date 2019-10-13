@@ -1,10 +1,10 @@
-import taco.bottle as bottle
-import taco.settings
-import taco.globals
-import taco.constants
-import taco.filesystem
-import taco.commands
-from taco.apis import post_routes
+# -*- coding: utf-8 -*-
+"""
+Routes for our simple bottle http server.
+"""
+from __future__ import unicode_literals
+from __future__ import print_function
+
 import platform
 import re
 import os
@@ -13,21 +13,27 @@ import logging
 import json
 import sys
 
+import taco.bottle as bottle
+from taco.globals import TacoApp
+from taco.constants import GB
+from taco.apis import post_routes
+
+
 if sys.version_info > (3, 0):
     unicode = str
-
 
 
 # static content
 @bottle.route('/static/<filename:path>')
 def send_file(filename):
-    return bottle.static_file(filename, root=os.path.normpath(os.getcwd() + '/static/'))
+    return bottle.static_file(
+        filename, root=os.path.normpath(os.getcwd() + '/static/'))
 
 
 # terminate
 @bottle.route('/shutitdown')
 def taco_page():
-    taco.globals.properexit(1, 1)
+    TacoApp.instance.proper_exit(1, 1)
     return
 
 
@@ -133,12 +139,14 @@ def getData(what):
         if m:
             output = m.group(1)
     if what == "diskfree":
-        with taco.globals.settings_lock:
-            down_dir = taco.globals.settings["Download Location"]
+        app = TacoApp.instance
+        with app.settings_lock:
+            down_dir = TacoApp.instance.settings["Download Location"]
         if os.path.isdir(down_dir):
-            (free, total) = taco.filesystem.Get_Free_Space(down_dir)
+            from taco.filesystem import Get_Free_Space
+            (free, total) = Get_Free_Space(down_dir)
             if free == 0 and total == 0:
                 output = 0.0
             else:
-                output = free / taco.constants.GB
+                output = free / GB
     return str(output)

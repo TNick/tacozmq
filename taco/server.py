@@ -1,17 +1,25 @@
+# -*- coding: utf-8 -*-
+"""
+This is the zmq server for the local machine.
+"""
+from __future__ import unicode_literals
+from __future__ import print_function
+
 import threading
 import logging
 import time
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
-import taco.globals
-import taco.constants
-import taco.commands
 import os
+
+from taco.constants import KEY_GENERATION_PREFIX
+from taco.utils import norm_path
 
 
 class TacoServer(threading.Thread):
-    def __init__(self):
+    def __init__(self, app):
         threading.Thread.__init__(self)
+        self.app = app
 
         self.stop = threading.Event()
 
@@ -44,7 +52,7 @@ class TacoServer(threading.Thread):
 
     def get_status(self):
         with self.status_lock:
-            return (self.status, self.status_time)
+            return self.status, self.status_time
 
     def run(self):
         self.set_status("Server Startup")
@@ -57,16 +65,16 @@ class TacoServer(threading.Thread):
         serverauth = ThreadAuthenticator(serverctx)
         serverauth.start()
 
-        with taco.globals.settings_lock:
-            bindip = taco.globals.settings["Application IP"]
-            bindport = taco.globals.settings["Application Port"]
-            localuuid = taco.globals.settings["Local UUID"]
-            publicdir = os.path.normpath(os.path.abspath(
-                taco.globals.settings["TacoNET Certificates Store"] + "/" + taco.globals.settings[
-                    "Local UUID"] + "/public/"))
-            privatedir = os.path.normpath(os.path.abspath(
-                taco.globals.settings["TacoNET Certificates Store"] + "/" + taco.globals.settings[
-                    "Local UUID"] + "/private/"))
+        with self.app.settings_lock:
+            bindip = self.app.settings["Application IP"]
+            bindport = self.app.settings["Application Port"]
+            localuuid = self.app.settings["Local UUID"]
+            publicdir = norm_path(
+                self.app.settings["TacoNET Certificates Store"] + "/" + self.app.settings[
+                    "Local UUID"] + "/public/")
+            privatedir = norm_path(
+                self.app.settings["TacoNET Certificates Store"] + "/" + self.app.settings[
+                    "Local UUID"] + "/private/")
 
         self.set_status("Configuring Curve to use publickey dir:" + publicdir)
         serverauth.configure_curve(domain='*', location=publicdir)
@@ -78,7 +86,7 @@ class TacoServer(threading.Thread):
 
         self.set_status("Loading Server Certs", 1)
         server_public, server_secret = zmq.auth.load_certificate(os.path.normpath(
-            os.path.abspath(privatedir + "/" + taco.constants.KEY_GENERATION_PREFIX + "-server.key_secret")))
+            os.path.abspath(privatedir + "/" + KEY_GENERATION_PREFIX + "-server.key_secret")))
         server.curve_secretkey = server_secret
         server.curve_publickey = server_public
 
@@ -97,15 +105,15 @@ class TacoServer(threading.Thread):
             if server in socks and socks[server] == zmq.POLLIN:
                 # self.set_status("Getting a request")
                 data = server.recv()
-                with taco.globals.download_limiter_lock:
-                    taco.globals.download_limiter.add(len(data))
-                (client_uuid, reply) = taco.commands.Proccess_Request(data)
+                with self.app.download_limiter_lock:
+                    self.app.download_limiter.add(len(data))
+                (client_uuid, reply) = self.app.commands.Proccess_Request(data)
                 if client_uuid != "0": self.set_client_last_request(client_uuid)
             socks = dict(poller.poll(10))
             if server in socks and socks[server] == zmq.POLLOUT:
                 # self.set_status("Replying to a request")
-                with taco.globals.upload_limiter_lock:
-                    taco.globals.upload_limiter.add(len(reply))
+                with self.app.upload_limiter_lock:
+                    self.app.upload_limiter.add(len(reply))
                 server.send(reply)
 
         self.set_status("Stopping zmq server with 0 second linger")

@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+"""
+Package-wide constants.
+"""
+from __future__ import unicode_literals
 from socket import gethostname
 import re
 

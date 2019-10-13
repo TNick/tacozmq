@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+Application-level defaults.
+"""
+from __future__ import unicode_literals
+
 import uuid
 import taco.constants
 import sys
