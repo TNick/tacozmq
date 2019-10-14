@@ -13,7 +13,7 @@ from zmq.auth.thread import ThreadAuthenticator
 import os
 
 from taco.constants import KEY_GENERATION_PREFIX
-from taco.utils import norm_path
+from taco.utils import norm_path, norm_join
 
 
 class TacoServer(threading.Thread):
@@ -31,6 +31,10 @@ class TacoServer(threading.Thread):
 
         self.client_last_request_time = {}
         self.client_last_request_time_lock = threading.Lock()
+
+        self.server_ctx = None
+        self.server_auth = None
+        self.socket = None
 
     def set_client_last_request(self, peer_uuid):
         # self.set_status("Server has serviced a request from:" + peer_uuid)
@@ -56,16 +60,16 @@ class TacoServer(threading.Thread):
         with self.status_lock:
             return self.status, self.status_time
 
-    def run(self):
+    def create(self):
+        """ Called from run() to initialize the state at thread startup. """
         self.set_status("Server Startup")
 
         self.set_status("Creating zmq Contexts", 1)
-        serverctx = zmq.Context()
+        self.server_ctx = zmq.Context()
 
         self.set_status("Starting zmq ThreadedAuthenticator", 1)
-        # serverauth = zmq.auth.ThreadedAuthenticator(serverctx)
-        serverauth = ThreadAuthenticator(serverctx)
-        serverauth.start()
+        self.server_auth = ThreadAuthenticator(self.server_ctx)
+        self.server_auth.start()
 
         with self.app.settings_lock:
             if self.bind_ip is None:
@@ -73,45 +77,64 @@ class TacoServer(threading.Thread):
             if self.bind_port is None:
                 self.bind_port = self.app.settings["Application Port"]
 
-            localuuid = self.app.settings["Local UUID"]
-            publicdir = norm_path(
-                self.app.settings["TacoNET Certificates Store"] + "/" + self.app.settings[
-                    "Local UUID"] + "/public/")
-            privatedir = norm_path(
-                self.app.settings["TacoNET Certificates Store"] + "/" + self.app.settings[
-                    "Local UUID"] + "/private/")
+            local_uuid = self.app.settings["Local UUID"]
+            public_dir = norm_join(
+                self.app.settings["TacoNET Certificates Store"],
+                self.app.settings["Local UUID"],
+                "public")
+            private_dir = norm_join(
+                self.app.settings["TacoNET Certificates Store"],
+                self.app.settings["Local UUID"],
+                "private")
 
-        self.set_status("Configuring Curve to use publickey dir:" + publicdir)
-        serverauth.configure_curve(domain='*', location=publicdir)
-        # auth.configure_curve(domain='*', location=zmq.auth.CURVE_ALLOW_ANY)
+        self.set_status(
+            "Configuring Curve to use public key dir:" + public_dir)
+        self.server_auth.configure_curve(domain='*', location=private_dir)
 
-        self.set_status("Creating Server Context", 1)
-        server = serverctx.socket(zmq.REP)
-        server.setsockopt(zmq.LINGER, 0)
+        self.set_status("Creating Server Context...", 1)
+        socket = self.server_ctx.socket(zmq.REP)
+        socket.setsockopt(zmq.LINGER, 0)
 
-        self.set_status("Loading Server Certs", 1)
-        server_public, server_secret = zmq.auth.load_certificate(os.path.normpath(
-            os.path.abspath(privatedir + "/" + KEY_GENERATION_PREFIX + "-server.key_secret")))
-        server.curve_secretkey = server_secret
-        server.curve_publickey = server_public
+        self.set_status("Loading Server Certs...", 1)
+        server_public, server_secret = zmq.auth.load_certificate(
+            norm_join(private_dir,
+                      KEY_GENERATION_PREFIX + "-server.key_secret"))
+        socket.curve_secretkey = server_secret
+        socket.curve_publickey = server_public
 
-        server.curve_server = True
+        socket.curve_server = True
         if self.bind_ip == "0.0.0.0":
             self.bind_ip = "*"
         address = "tcp://%s:%d" % (self.bind_ip, self.bind_port)
         self.set_status("Server is now listening for encrypted "
                         "ZMQ connections @ %s" % address)
-        server.bind(address)
+        socket.bind(address)
+        self.socket = socket
+
+    def terminate(self):
+        """ Called from run() to terminat the state at thread finish. """
+        self.set_status("Stopping zmq server with 0 second linger")
+        self.socket.close(0)
+        self.set_status("Stopping zmq ThreadedAuthenticator")
+        self.server_auth.stop()
+        self.server_ctx.term()
+        self.set_status("Server Exit")
+        self.server_ctx = None
+        self.server_auth = None
+        self.socket = None
+
+    def run(self):
+        self.create()
 
         poller = zmq.Poller()
-        poller.register(server, zmq.POLLIN | zmq.POLLOUT)
+        poller.register(self.socket, zmq.POLLIN | zmq.POLLOUT)
 
         while not self.stop.is_set():
             reply = ""
             socks = dict(poller.poll(200))
-            if server in socks and socks[server] == zmq.POLLIN:
+            if self.socket in socks and socks[self.socket] == zmq.POLLIN:
                 # self.set_status("Getting a request")
-                data = server.recv()
+                data = self.socket.recv()
                 with self.app.download_limiter_lock:
                     self.app.download_limiter.add(len(data))
                 (client_uuid, reply) = self.app.commands.Proccess_Request(data)
@@ -119,15 +142,10 @@ class TacoServer(threading.Thread):
                     self.set_client_last_request(client_uuid)
 
             socks = dict(poller.poll(10))
-            if server in socks and socks[server] == zmq.POLLOUT:
+            if self.socket in socks and socks[self.socket] == zmq.POLLOUT:
                 # self.set_status("Replying to a request")
                 with self.app.upload_limiter_lock:
                     self.app.upload_limiter.add(len(reply))
-                server.send(reply)
+                self.socket.send(reply)
 
-        self.set_status("Stopping zmq server with 0 second linger")
-        server.close(0)
-        self.set_status("Stopping zmq ThreadedAuthenticator")
-        serverauth.stop()
-        serverctx.term()
-        self.set_status("Server Exit")
+        self.terminate()
