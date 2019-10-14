@@ -161,14 +161,14 @@ class TacoCommands(object):
                     if peer_data["nickname"] != new_nickname:
                         if NICKNAME_CHECKER.match(new_nickname):
                             peer_data["nickname"] = new_nickname
-                            self.app.Save_Settings(False)
+                            self.app.store.Save_Settings(False)
                 else:
                     if NICKNAME_CHECKER.match(new_nickname):
                         peer_data["nickname"] = new_nickname
-                        self.app.Save_Settings(False)
+                        self.app.store.Save_Settings(False)
                     else:
                         peer_data["nickname"] = "GENERIC NICKNAME"
-                        self.app.Save_Settings(False)
+                        self.app.store.Save_Settings(False)
             for peer_id in unpacked[1:]:
                 if UUID_CHECKER.match(peer_id):
                     if peer_id not in self.app.settings["Peers"].keys() \
@@ -218,7 +218,7 @@ class TacoCommands(object):
                                 "localnick": "",
                                 "nickname": nickname
                             }
-                            self.app.Save_Settings(False)
+                            self.app.store.Save_Settings(False)
 
         return response
 

@@ -98,7 +98,7 @@ class TacoClients(threading.Thread):
                       KEY_GENERATION_PREFIX + "-client.key_secret"))
         new_socket.curve_secretkey = client_secret
         new_socket.curve_publickey = client_public
-        new_socket.curve_serverkey = str(peer_data["serverkey"])
+        new_socket.curve_serverkey = str(peer_data["serverkey"]).encode('ascii')
         address_str = "tcp://%s:%d" % (ip_of_client, peer_data["port"])
         new_socket.connect(address_str)
         self.set_status("Client for %s started at %s" % (
@@ -244,7 +244,7 @@ class TacoClients(threading.Thread):
             while not self.app.high_priority_output_queue[peer_uuid].empty():
                 self.set_status("high priority output q not empty:" + peer_uuid)
                 data = self.app.high_priority_output_queue[peer_uuid].get()
-                peer_socket.send_multipart(['', data])
+                peer_socket.send_multipart([b'', data])
                 self.sleep.set()
                 with self.app.upload_limiter_lock:
                     self.app.upload_limiter.add(len(data))
@@ -255,7 +255,7 @@ class TacoClients(threading.Thread):
             while not self.app.medium_priority_output_queue[peer_uuid].empty():
                 self.set_status("medium priority output q not empty:" + peer_uuid)
                 data = self.app.medium_priority_output_queue[peer_uuid].get()
-                peer_socket.send_multipart(['', data])
+                peer_socket.send_multipart([b'', data])
                 self.sleep.set()
                 with self.app.upload_limiter_lock:
                     self.app.upload_limiter.add(len(data))
@@ -270,7 +270,7 @@ class TacoClients(threading.Thread):
                     self.set_status(
                         "low priority output q not empty+free bw:" + peer_uuid)
                     data = self.app.low_priority_output_queue[peer_uuid].get()
-                    peer_socket.send_multipart(['', data])
+                    peer_socket.send_multipart([b'', data])
                     self.sleep.set()
                     with self.app.upload_limiter_lock:
                         self.app.upload_limiter.add(len(data))
@@ -299,7 +299,7 @@ class TacoClients(threading.Thread):
                     self.set_status(
                         "filereq output q not empty+free bw:" + peer_uuid)
                     data = self.app.file_request_output_queue[peer_uuid].get()
-                    peer_socket.send_multipart(['', data])
+                    peer_socket.send_multipart([b'', data])
                     self.sleep.set()
                     with self.app.upload_limiter_lock:
                         self.app.upload_limiter.add(len(data))
@@ -309,7 +309,7 @@ class TacoClients(threading.Thread):
         if self.next_rollcall[peer_uuid] >= time.time():
             return
         data = self.app.commands.Request_Rollcall()
-        peer_socket.send_multipart(['', data])
+        peer_socket.send_multipart([b'', data])
         with self.app.upload_limiter_lock:
             self.app.upload_limiter.add(len(data))
         self.next_rollcall[peer_uuid] = \

@@ -157,7 +157,9 @@ class TacoApp(object):
         self.server.join()
         self.clients.join()
         from taco.server import TacoServer
-        self.server = TacoServer(self)
+        self.server = TacoServer(
+            self, bind_ip=self.server.bind_ip,
+            bind_port=self.server.bind_port)
         from taco.clients import TacoClients
         self.clients = TacoClients(self)
         self.server.start()
