@@ -9,10 +9,11 @@ import threading
 
 import taco.constants
 import logging
-import os
 import uuid
 
-from taco.utils import ShutDownException
+from .utils import ShutDownException
+
+logger = logging.getLogger('tacozmq.app')
 
 
 class TacoApp(object):
@@ -166,7 +167,7 @@ class TacoApp(object):
         self.clients.start()
 
     def Add_To_Output_Queue(self, peer_uuid, msg, priority=3):
-        logging.debug("Add to " + peer_uuid + " output q @ " + str(priority))
+        logger.debug("Add to " + peer_uuid + " output q @ " + str(priority))
         if priority == 1:
             with self.high_priority_output_queue_lock:
                 if peer_uuid in self.high_priority_output_queue:
@@ -195,7 +196,7 @@ class TacoApp(object):
         return 0
 
     def Add_To_All_Output_Queues(self, msg, priority=3):
-        logging.debug("Add to ALL output q @ " + str(priority))
+        logger.debug("Add to ALL output q @ " + str(priority))
         if priority == 1:
             with self.high_priority_output_queue_lock:
                 for key_name in self.high_priority_output_queue:
@@ -227,12 +228,12 @@ class TacoApp(object):
         if self.server is None:
             return
         self.stop.set()
-        logging.info("Stopping Server")
+        logger.info("Stopping Server")
         self.server.stop.set()
-        logging.info("Stopping Clients")
+        logger.info("Stopping Clients")
         self.clients.stop.set()
         self.clients.sleep.set()
-        logging.info("Stopping Filesystem Workers")
+        logger.info("Stopping Filesystem Workers")
         self.filesys.stop.set()
         self.filesys.sleep.set()
         self.server.join()
@@ -241,13 +242,13 @@ class TacoApp(object):
         self.clients = None
         self.filesys.join()
         self.filesys = None
-        logging.debug("Dispatcher Stopped Successfully")
-        logging.info("Clean Exit")
+        logger.debug("Dispatcher Stopped Successfully")
+        logger.info("Clean Exit")
 
 
 def proper_exit(signum, frame):
     """ Signal handler. """
-    logging.warning("SIGINT Detected, stopping " + taco.constants.APP_NAME)
+    logger.warning("SIGINT Detected, stopping " + taco.constants.APP_NAME)
     app = TacoApp.instance
     if app is not None:
         app.proper_exit()

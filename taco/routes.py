@@ -14,11 +14,11 @@ import json
 import sys
 
 from bottle import Bottle, static_file, template, request
-from taco.globals import TacoApp
 from taco.constants import GB
 from taco.apis import post_routes
 from taco.utils import norm_join, ShutDownException
 
+logger = logging.getLogger('tacozmq.app')
 if sys.version_info > (3, 0):
     unicode = str
 
@@ -44,15 +44,15 @@ def create_bottle(app):
         if app.cherry is not None:
             app.cherry.stop()
             app.cherry = None
-        logging.debug("Completed the shutdown sequence (%d)" %
+        logger.debug("Completed the shutdown sequence (%d)" %
                       shutdown_counter[0])
         shutdown_counter[0] = shutdown_counter[0] - 1
         if shutdown_counter[0] <= 1:
-            logging.debug("Forcing exit using sys.exit...")
+            logger.debug("Forcing exit using sys.exit...")
             import sys
             sys.exit(0)
         elif shutdown_counter[0] <= 0:
-            logging.debug("Forcing exit using os._exit...")
+            logger.debug("Forcing exit using os._exit...")
             import os
             os._exit(0)
 
@@ -95,7 +95,7 @@ def create_bottle(app):
             result = post_routes[action](jdata, app)
             return result
 
-        logging.error("action %s is not part of post routes", action)
+        logger.error("action %s is not part of post routes", action)
         return "-1"
 
     @result.route('/browselocaldirs/')
@@ -112,13 +112,13 @@ def create_bottle(app):
             try:
                 base_dir = os.environ['HOME']
                 if not os.path.isdir(base_dir):
-                    logging.debug("%s does not exist", base_dir)
+                    logger.debug("%s does not exist", base_dir)
                     base_dir = os.environ['HOMEDRIVE'] + os.environ['HOMEPATH']
                     if not os.path.isdir(base_dir):
-                        logging.debug("%s does not exist", base_dir)
+                        logger.debug("%s does not exist", base_dir)
                         base_dir = os.environ['PUBLIC']
                         if not os.path.isdir(base_dir):
-                            logging.debug("%s does not exist", base_dir)
+                            logger.debug("%s does not exist", base_dir)
                             from pathlib import Path
                             base_dir = str(Path.home())
                             if not os.path.isdir(base_dir):
@@ -131,7 +131,7 @@ def create_bottle(app):
             except Exception:
                 browse_path = ""
         try:
-            logging.debug("Listing directories in %s", browse_path)
+            logger.debug("Listing directories in %s", browse_path)
             contents = os.listdir(browse_path)
         except (FileNotFoundError, PermissionError):
             contents = []
@@ -150,7 +150,7 @@ def create_bottle(app):
     @result.route('/get/<what>')
     def get__data(what):
         output = ""
-        logging.debug("Route -- Getting your: " + what)
+        logger.debug("Route -- Getting your: " + what)
         if what == "uuid":
             return uuid.uuid4().hex
         if what == "ip":

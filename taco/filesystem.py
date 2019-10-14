@@ -15,6 +15,7 @@ import uuid
 from taco.constants import *
 from taco.utils import norm_join
 
+logger = logging.getLogger('tacozmq.fs')
 if sys.version_info < (3, 0):
     from Queue import Queue
 else:
@@ -55,7 +56,7 @@ def Is_Path_Under_A_Share(app, path):
                 if os.path.commonprefix([dirpath, dirpath2]) == dirpath:
                     return_value = True
                     break
-    # logging.debug(path + " -- " + str(return_value))
+    # logger.debug(path + " -- " + str(return_value))
     return return_value
 
 
@@ -66,7 +67,7 @@ def Convert_Share_To_Path(app, share):
             if share_name == share:
                 return_val = share_path
                 break
-    # logging.debug(share + " -- " + str(return_val))
+    # logger.debug(share + " -- " + str(return_val))
     return return_val
 
 
@@ -114,13 +115,13 @@ class TacoFilesystemManager(threading.Thread):
 
     def set_status(self, text, level=0):
         if level == 1:
-            logging.info(text)
+            logger.info(text)
         elif level == 0:
-            logging.debug(text)
+            logger.debug(text)
         elif level == 2:
-            logging.warning(text)
+            logger.warning(text)
         elif level == 3:
-            logging.error(text)
+            logger.error(text)
         with self.status_lock:
             self.status = text
             self.status_time = time.time()
@@ -145,7 +146,7 @@ class TacoFilesystemManager(threading.Thread):
                 str((share_dir, file_name, file_size,
                      file_mod, chunk_uuid, file_offset)))
 
-            request = self.app.commands.Request_Get_File_Chunk(
+            request = self.app.commands.request_get_file_chunk_cmd(
                 share_dir, file_name, file_offset, chunk_uuid)
             self.app.Add_To_Output_Queue(peer_uuid, request, 4)
             self.client_downloading_requested_chunks[peer_uuid]\
@@ -394,7 +395,7 @@ class TacoFilesystemManager(threading.Thread):
                 if offset < os.path.getsize(fullpath):
                     self.files_r[fullpath].seek(offset)
                     chunk_data = self.files_r[fullpath].read(FILESYSTEM_CHUNK_SIZE)
-                    request = self.app.commands.Request_Give_File_Chunk(chunk_data, chunk_uuid)
+                    request = self.app.commands.request_give_file_chunk_cmd(chunk_data, chunk_uuid)
                     self.app.Add_To_Output_Queue(peer_uuid, request, 3)
                     self.sleep.set()
                     self.app.clients.sleep.set()
@@ -408,7 +409,7 @@ class TacoFilesystemManager(threading.Thread):
                     for [peer_uuid, share_dir, shareuuid] in self.results_to_return:
                         if share_dir in self.listings.keys():
                             self.set_status("RESULTS ready to send:" + str((share_dir, shareuuid)))
-                            request = self.app.commands.Request_Share_Listing_Results(share_dir, shareuuid,
+                            request = self.app.commands.request_share_listing_result_cmd(share_dir, shareuuid,
                                                                                   self.listings[share_dir])
                             self.app.Add_To_Output_Queue(peer_uuid, request, 2)
                             self.app.clients.sleep.set()
@@ -503,13 +504,13 @@ class TacoFilesystemWorker(threading.Thread):
 
     def set_status(self, text, level=0):
         if level == 1:
-            logging.info(text)
+            logger.info(text)
         elif level == 0:
-            logging.debug(text)
+            logger.debug(text)
         elif level == 2:
-            logging.warning(text)
+            logger.warning(text)
         elif level == 3:
-            logging.error(text)
+            logger.error(text)
         with self.status_lock:
             self.status = text
             self.status_time = time.time()
@@ -565,7 +566,7 @@ class TacoFilesystemWorker(threading.Thread):
                     files.sort()
                     results = [1, time.time(), root_share_dir, dirs, files]
                 except Exception:
-                    logging.exception("Failed to obtain the list of files")
+                    logger.exception("Failed to obtain the list of files")
                     results = [0, time.time(), root_share_dir, [], []]
 
             self.app.filesys.listing_results_queue.put(results)

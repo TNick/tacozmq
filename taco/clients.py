@@ -10,22 +10,24 @@ import logging
 import time
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
-from taco.constants import *
-import os
 from socket import gethostbyname, gaierror
 import sys
 import random
 
-from taco.utils import norm_join
+from .constants import *
+from .utils import norm_join
 
 if sys.version_info < (3, 0):
     from Queue import Queue
 else:
     from queue import Queue
 
+logger = logging.getLogger('tacozmq.clients')
+
 
 class TacoClients(threading.Thread):
     def __init__(self, app):
+        logger.debug('clients manager is being constructed...')
         threading.Thread.__init__(self)
         self.app = app
 
@@ -57,8 +59,15 @@ class TacoClients(threading.Thread):
         self.chunk_request_rate = 0.0
         self.error_msg = []
 
+        self.client_ctx = None
+        self.client_auth = None
+        self.public_dir = None
+        self.private_dir = None
+        logger.debug('clients manager constructed')
+
     def set_client_last_reply(self, peer_uuid):
-        # logging.debug("Got Reply from: " + peer_uuid)
+        """ Whenever we receive a reply we update the status. """
+        logger.log(TRACE, "got reply from %s", peer_uuid)
         self.client_reconnect_mod[peer_uuid] = CLIENT_RECONNECT_MIN
         self.client_timeout[peer_uuid] = time.time() + ROLLCALL_TIMEOUT
         with self.client_last_reply_time_lock:
@@ -72,13 +81,13 @@ class TacoClients(threading.Thread):
 
     def set_status(self, text, level=0):
         if level == 1:
-            logging.info(text)
+            logger.info(text)
         elif level == 0:
-            logging.debug(text)
+            logger.debug(text)
         elif level == 2:
-            logging.warning(text)
+            logger.warning(text)
         elif level == 3:
-            logging.error(text)
+            logger.error(text)
         with self.status_lock:
             self.status = text
             self.status_time = time.time()
@@ -91,6 +100,7 @@ class TacoClients(threading.Thread):
                            private_dir, peer_data, ip_of_client):
         """ Creates the socket, sets it up, creates queues for it and
         saves a reference in our list of clients. """
+
         new_socket = client_ctx.socket(zmq.DEALER)
         new_socket.setsockopt(zmq.LINGER, 0)
         client_public, client_secret = zmq.auth.load_certificate(
@@ -158,6 +168,7 @@ class TacoClients(threading.Thread):
 
     def state_update(self, client_ctx, private_dir, poller):
         """ Called regularly to update the status of the peers. """
+        logger.log(TRACE, 'state being updated...')
         with self.app.settings_lock:
             self.max_upload_rate = \
                 self.app.settings["Upload Limit"] * KB
@@ -171,9 +182,11 @@ class TacoClients(threading.Thread):
             for peer_uuid in self.app.settings["Peers"].keys():
                 if self.app.settings["Peers"][peer_uuid]["enabled"]:
                     self.run_peer(peer_uuid, client_ctx, private_dir, poller)
+        logger.log(TRACE, 'state updated')
 
     def perform_peer(self, peer_uuid, poller):
         """ Called for connected peers to do some work. """
+        logger.log(TRACE, 'peer %s is being processed...', peer_uuid)
         peer_socket = self.clients[peer_uuid]
         self.perform_high_priority(peer_uuid, peer_socket)
         self.perform_medium_priority(peer_uuid, peer_socket)
@@ -181,28 +194,45 @@ class TacoClients(threading.Thread):
         self.perform_low_priority(peer_uuid, peer_socket)
         self.perform_rollcall(peer_uuid, peer_socket)
         self.receive_block(peer_uuid, peer_socket, poller)
+        logger.log(TRACE, 'peer %s processed', peer_uuid)
 
-    def run(self):
+    def create(self):
+        """ Called from run() to initialize the state at thread startup. """
         self.set_status("Client Startup")
         self.set_status("Creating zmq Contexts", 1)
-        client_ctx = zmq.Context()
+        self.client_ctx = zmq.Context()
         self.set_status("Starting zmq ThreadedAuthenticator", 1)
         # client_auth = zmq.auth.ThreadedAuthenticator(client_ctx)
-        client_auth = ThreadAuthenticator(client_ctx)
-        client_auth.start()
+        self.client_auth = ThreadAuthenticator(self.client_ctx)
+        self.client_auth.start()
 
         with self.app.settings_lock:
-            public_dir = norm_join(
+            self.public_dir = norm_join(
                 self.app.settings["TacoNET Certificates Store"],
                 self.app.settings["Local UUID"],
                 "public")
-            private_dir = norm_join(
+            self.private_dir = norm_join(
                 self.app.settings["TacoNET Certificates Store"],
                 self.app.settings["Local UUID"],
                 "private")
 
-        self.set_status("Configuring Curve to use publickey dir:" + public_dir)
-        client_auth.configure_curve(domain='*', location=public_dir)
+        self.set_status("Configuring Curve to use publickey dir:" +
+                        self.public_dir)
+        self.client_auth.configure_curve(domain='*', location=self.public_dir)
+        logger.debug("clients manager started")
+
+    def terminate(self):
+        self.set_status("Terminating Clients")
+        for peer_uuid in self.clients.keys():
+            self.clients[peer_uuid].close(0)
+
+        self.set_status("Stopping zmq ThreadedAuthenticator")
+        self.client_auth.stop()
+        self.client_ctx.term()
+        self.set_status("Clients Exit")
+
+    def run(self):
+        self.create()
 
         poller = zmq.Poller()
         while not self.stop.is_set():
@@ -214,9 +244,13 @@ class TacoClients(threading.Thread):
             if self.stop.is_set():
                 break
 
+            time_now = time.time()
+            logger.log(TRACE, 'client loop at t %r and previous at %r',
+                       time_now, self.connect_block_time)
+
             # Every second or so we update the state of peers.
-            if abs(time.time() - self.connect_block_time) > 1:
-                self.state_update(client_ctx, private_dir, poller)
+            if abs(time_now - self.connect_block_time) > 1:
+                self.state_update(self.client_ctx, self.private_dir, poller)
                 self.connect_block_time = time.time()
 
             # Anything to do?
@@ -224,19 +258,14 @@ class TacoClients(threading.Thread):
                 continue
 
             # We have some peers connected so shuffle them and let's roll.
-            peer_keys = self.clients.keys()
+            peer_keys = list(self.clients.keys())
             random.shuffle(peer_keys)
             for peer_uuid in peer_keys:
                 self.perform_peer(peer_uuid, poller)
 
-        self.set_status("Terminating Clients")
-        for peer_uuid in self.clients.keys():
-            self.clients[peer_uuid].close(0)
+            logger.log(TRACE, 'client loop done')
 
-        self.set_status("Stopping zmq ThreadedAuthenticator")
-        client_auth.stop()
-        client_ctx.term()
-        self.set_status("Clients Exit")
+        self.terminate()
 
     def perform_high_priority(self, peer_uuid, peer_socket):
         """ High priority queue processing. """
@@ -274,13 +303,17 @@ class TacoClients(threading.Thread):
                     self.sleep.set()
                     with self.app.upload_limiter_lock:
                         self.app.upload_limiter.add(len(data))
+                else:
+                    logger.log(TRACE, 'upload rate %d > max_upload_rate %d',
+                               upload_rate, self.max_upload_rate)
 
     def perform_file_transaction(self, peer_uuid, peer_socket):
         """ File request queue, aka the download throttle. """
         if time.time() < self.file_request_time:
+            logger.log(TRACE, 'not the time for file transfer, yet')
             return
-
         self.file_request_time = time.time()
+
         with self.app.file_request_output_queue_lock:
             if not self.app.file_request_output_queue[peer_uuid].empty():
                 with self.app.download_limiter_lock:
@@ -288,6 +321,8 @@ class TacoClients(threading.Thread):
 
                 bw_percent = download_rate / self.max_download_rate
                 wait_time = self.chunk_request_rate * bw_percent
+                logger.log(TRACE, 'file transaction %f wait time %r',
+                           bw_percent, wait_time)
 
                 # self.set_status(str((download_rate,
                 #   self.max_download_rate,self.chunk_request_rate,
@@ -303,17 +338,26 @@ class TacoClients(threading.Thread):
                     self.sleep.set()
                     with self.app.upload_limiter_lock:
                         self.app.upload_limiter.add(len(data))
+                else:
+                    logger.log(TRACE,
+                               "download_rate %r > max_download_rate %r",
+                               download_rate, self.max_download_rate)
 
     def perform_rollcall(self, peer_uuid, peer_socket):
-        """ File request queue, aka the download throttle. """
+        """ Make sure the network is responsive. """
         if self.next_rollcall[peer_uuid] >= time.time():
             return
-        data = self.app.commands.Request_Rollcall()
+
+        data = self.app.commands.request_rollcall_cmd()
         peer_socket.send_multipart([b'', data])
         with self.app.upload_limiter_lock:
             self.app.upload_limiter.add(len(data))
-        self.next_rollcall[peer_uuid] = \
+        expect_answer = \
             time.time() + random.randint(ROLLCALL_MIN, ROLLCALL_MAX)
+        self.next_rollcall[peer_uuid] = expect_answer
+        logger.log(TRACE, "hart-beat send to peer %s; "
+                          "expected to answer until %r",
+                   peer_uuid, expect_answer)
         self.sleep.set()
 
     def receive_block(self, peer_uuid, peer_socket, poller):
@@ -321,14 +365,20 @@ class TacoClients(threading.Thread):
         socks = dict(poller.poll(0))
         while peer_socket in socks and socks[peer_socket] == zmq.POLLIN:
             sink, data = peer_socket.recv_multipart()
+            logger.log(TRACE, "peer %s sent %d bytes", peer_uuid, len(data))
             with self.app.download_limiter_lock:
                 self.app.download_limiter.add(len(data))
             self.set_client_last_reply(peer_uuid)
-            self.next_request = self.app.commands.Process_Reply(peer_uuid, data)
+            self.next_request = self.app.commands.process_reply(peer_uuid, data)
             if self.next_request != "":
+                logger.log(TRACE, "will reply to peer %s with %d bytes",
+                           peer_uuid, len(self.next_request))
                 with self.app.medium_priority_output_queue_lock:
                     self.app.medium_priority_output_queue[peer_uuid] \
                         .put(self.next_request)
+            else:
+                logger.log(TRACE, "no reply to peer %s", peer_uuid,)
+
             self.sleep.set()
             socks = dict(poller.poll(0))
 
@@ -346,7 +396,7 @@ class TacoClients(threading.Thread):
 
     def handle_peer_errors(self, peer_uuid, peer_socket, poller, error_msg):
         """
-        Called when a peer failed to responds to hartbeat or we've seen
+        Called when a peer failed to responds to hart-beat or we've seen
         socket errors.
 
         The corresponding socket is removed from the pooler and is closed.
@@ -379,5 +429,8 @@ class TacoClients(threading.Thread):
             min(self.client_reconnect_mod[peer_uuid] + CLIENT_RECONNECT_MOD,
                 CLIENT_RECONNECT_MAX)
         # SStore the time when we should attmpt next reconnect.
-        self.client_connect_time[peer_uuid] = \
-            time.time() + self.client_reconnect_mod[peer_uuid]
+        next_time = time.time() + self.client_reconnect_mod[peer_uuid]
+        self.client_connect_time[peer_uuid] = next_time
+        logger.debug("socket closed for peer %s; "
+                     "will attempt reconnect at %r",
+                     peer_uuid, next_time)

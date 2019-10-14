@@ -14,6 +14,8 @@ from taco.constants import JSON_SETTINGS_FILENAME, APP_NAME
 import taco.defaults
 from taco.utils import norm_join, norm_path
 
+logger = logging.getLogger('tacozmq.cmd')
+
 
 class TacoSettings(object):
     def __init__(self, app):
@@ -21,20 +23,20 @@ class TacoSettings(object):
         self.app = app
 
     def Load_Settings(self, needlock=True):
-        logging.debug("loading settings ...")
+        logger.debug("loading settings ...")
         save_after = False
         if needlock:
             self.app.settings_lock.acquire()
 
         try:
             try:
-                logging.debug("Loading Settings JSON")
+                logger.debug("Loading Settings JSON")
                 with open(JSON_SETTINGS_FILENAME, 'r') as fin:
                     self.app.settings = json.load(fin)
             except Exception:
                 self.app.settings = {"Peers": {}, "Shares": []}
 
-            logging.debug("Verifying the settings loaded from the json "
+            logger.debug("Verifying the settings loaded from the json "
                           "isn't missing any required keys")
             for keyname in taco.defaults.default_settings_kv.keys():
                 if not keyname in self.app.settings:
@@ -43,15 +45,15 @@ class TacoSettings(object):
                     save_after = True
 
             if not os.path.isdir(self.app.settings["TacoNET Certificates Store"]):
-                logging.debug("Making %s Certificates Store", APP_NAME)
+                logger.debug("Making %s Certificates Store", APP_NAME)
                 os.makedirs(self.app.settings["TacoNET Certificates Store"])
 
-            logging.debug("Verifying settings share list is in correct format")
+            logger.debug("Verifying settings share list is in correct format")
             if not isinstance(self.app.settings["Shares"], list):
                 self.app.shares = []
                 save_after = True
 
-            logging.debug("Verifying settings peer dict is in correct format")
+            logger.debug("Verifying settings peer dict is in correct format")
             keep_keys = []
             for peer_uuid in self.app.settings["Peers"].keys():
                 peer_data = self.app.settings["Peers"][peer_uuid]
@@ -68,12 +70,12 @@ class TacoSettings(object):
             if needlock:
                 self.app.settings_lock.release()
 
-        logging.debug("settings loaded")
+        logger.debug("settings loaded")
         if save_after:
             self.Save_Settings()
 
     def Save_Settings(self, needlock=True):
-        logging.debug("saving settings...")
+        logger.debug("saving settings...")
         if needlock:
             self.app.settings_lock.acquire()
         try:
@@ -82,11 +84,11 @@ class TacoSettings(object):
         finally:
             if needlock:
                 self.app.settings_lock.release()
-        logging.debug("settings saved")
+        logger.debug("settings saved")
         self.Load_Settings(needlock)
 
     def Disable_Keys(self, keys_to_keep, needlock=True):
-        logging.debug("Disabling Peer Keys if Needed")
+        logger.debug("Disabling Peer Keys if Needed")
         if needlock:
             self.app.settings_lock.acquire()
         try:
@@ -103,20 +105,20 @@ class TacoSettings(object):
             os.makedirs(public_dir)
         filelisting = os.listdir(norm_path(public_dir))
         delete_files = []
-        logging.debug("Keys that will be kept: " + str(keys_to_keep))
+        logger.debug("Keys that will be kept: " + str(keys_to_keep))
         for filename in filelisting:
             if filename not in keys_to_keep:
                 delete_files.append(filename)
 
         for file_to_delete in delete_files:
-            logging.info("Deleting key: " + file_to_delete)
+            logger.info("Deleting key: " + file_to_delete)
             full_path = norm_join(public_dir, file_to_delete)
             if os.path.isfile(full_path):
                 os.remove(full_path)
 
     def Enable_Key(self, peer_uuid, key_type, key_string, needlock):
-        logging.info("Enabling KEY for UUID:%s -- %s -- %s",
-                     peer_uuid, key_type, key_string)
+        logger.info("Enabling KEY for UUID:%s -- %s -- %s",
+                    peer_uuid, key_type, key_string)
         template = (
             "\n"
             "#   **** Saved on %s by tacozmq  ****\n"

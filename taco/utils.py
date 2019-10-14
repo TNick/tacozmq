@@ -2,8 +2,6 @@
 """
 Small functions that are needed in several parts.
 """
-from __future__ import unicode_literals
-
 import os
 
 

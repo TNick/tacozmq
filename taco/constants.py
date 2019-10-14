@@ -115,3 +115,9 @@ NICKNAME_CHECKER = re.compile(RE_NICKNAME_CHECKER, re.UNICODE)
 CHAT_CHECKER = re.compile(RE_CHAT_CHECKER, re.UNICODE)
 SHARE_NAME_CHECKER = re.compile(u"^\w[\w \-\.]{1,126}\w$", re.UNICODE)
 DIR_NAME_CHECKER = re.compile(u"^\w[\w \-\.]{1,126}\w$", re.UNICODE)
+
+# The most verbose level for logging.
+TRACE = 1
+
+# Indicates there is no identity in a result that usually returns an identity
+NO_IDENTITY = "0"

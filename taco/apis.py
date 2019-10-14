@@ -15,10 +15,11 @@ import logging
 import json
 import sys
 from collections import defaultdict
+
 from taco.globals import TacoApp
-from taco.constants import FILESYSTEM_WORKINPROGRESS_SUFFIX
+from taco.constants import FILESYSTEM_WORKINPROGRESS_SUFFIX, TRACE
 
-
+logger = logging.getLogger('tacozmq.apis')
 if sys.version_info > (3, 0):
     unicode = str
 
@@ -31,6 +32,7 @@ def post_route(action):
     """ Wrapper we use to collect all paths in a single dict. """
     def wrap(f):
         def wrapped_f(*args, **kwargs):
+            logger.log(TRACE, "servicing %s ...", action)
             result = f(*args, **kwargs)
             if result is None:
                 result = "-1"
@@ -38,7 +40,7 @@ def post_route(action):
                 result = str(result)
             elif not isinstance(result, str):
                 result = json.dumps(result)
-            logging.log(logging.DEBUG - 1, "Result for %s is: %s", action, result)
+            logger.log(TRACE, "result for %s is: %s", action, result)
             return result
 
         post_routes[action] = wrapped_f
@@ -155,7 +157,7 @@ def download_q_move(jdata, app):
         return -1
 
     with app.download_q_lock:
-        logging.debug(
+        logger.debug(
             "Moving File in Download Q: " + str((
                 peer_uuid, sharedir, filename, filesize, filemod, newloc)))
         if peer_uuid in app.download_q:
@@ -255,10 +257,10 @@ def browse(jdata, app):
             peer_uuid = data[u"uuid"]
             sharedir = data[u"sharedir"]
             browse_result_uuid = uuid.uuid4().hex
-            logging.critical(
+            logger.critical(
                 "Getting Directory Listing from: %s for share: %s",
                 peer_uuid, sharedir)
-            request = TacoApp.instance.commands.Request_Share_Listing(
+            request = TacoApp.instance.commands.request_share_listing_cmd(
                 peer_uuid, sharedir, browse_result_uuid)
             TacoApp.instance.Add_To_Output_Queue(peer_uuid, request, 2)
             return {
@@ -296,7 +298,7 @@ def settings_save(jdata, app):
     if isinstance(data, list):
         if len(data) >= 0:
             with app.settings_lock:
-                logging.info("API Access: SETTINGS -- Action: SAVE")
+                logger.info("API Access: SETTINGS -- Action: SAVE")
                 for (keyname, value) in data:
                     app.settings[keyname] = value
                 app.store.Save_Settings(False)
@@ -310,7 +312,7 @@ def share_save(jdata, app):
     if isinstance(data, list):
         if len(data) >= 0:
             with app.settings_lock:
-                logging.info("API Access: SHARE -- Action: SAVE")
+                logger.info("API Access: SHARE -- Action: SAVE")
                 app.settings["Shares"] = []
                 for (sharename, sharelocation) in data:
                     app.settings["Shares"].append([sharename, sharelocation])
@@ -345,7 +347,7 @@ def send_chat(jdata, app):
     data = jdata[u"data"]
     if isinstance(data, str) or isinstance(data, unicode):
         if len(data) > 0:
-            TacoApp.instance.commands.Request_Chat(data)
+            TacoApp.instance.commands.request_chat_cmd(data)
             return 1
     return -1
 
@@ -362,7 +364,7 @@ def peer_save(jdata, app):
     if isinstance(data, list):
         if len(data) >= 0:
             with app.settings_lock:
-                logging.info("API Access: PEER -- Action: SAVE")
+                logger.info("API Access: PEER -- Action: SAVE")
                 app.settings["Peers"] = {}
                 for (hostname, port, local_nick, peer_uuid, client_pub,
                      server_pub, dynamic, enabled) in data:
