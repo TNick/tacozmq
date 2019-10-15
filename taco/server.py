@@ -21,14 +21,28 @@ logger = logging.getLogger('tacozmq.server')
 
 
 class TacoServer(threading.Thread):
+    """ A thread that manages our reply server. """
     def __init__(self, app, bind_ip, bind_port):
+        """
+        Constructor.
+
+        :param app: The application instance where this belongs.
+        :param bind_ip: Address to bind to.
+        :param bind_port: Port to bind to.
+        """
         logger.debug('server %r:%r is being constructed...',
                      bind_ip, bind_port)
         threading.Thread.__init__(self)
         self.app = app
+
+        # TODO: in current implementation this may be None
+        # as this only gets the parameters from command line.
+        # If there were no parameters then - at start of thread -
+        # these are read from settings. I see no reason for this.
         self.bind_ip = bind_ip
         self.bind_port = bind_port
 
+        # Set this to terminate the thread.
         self.stop = threading.Event()
 
         self.status_lock = threading.Lock()
