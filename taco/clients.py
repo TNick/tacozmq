@@ -26,6 +26,7 @@ logger = logging.getLogger('tacozmq.clients')
 
 
 class TacoClients(threading.Thread):
+    """ A thread that manages the communication with peers. """
     def __init__(self, app):
         logger.debug('clients manager is being constructed...')
         threading.Thread.__init__(self)
@@ -33,6 +34,10 @@ class TacoClients(threading.Thread):
 
         # Set this to terminate the thread.
         self.stop = threading.Event()
+
+        # The inner loop sleeps on each loop 0.1 seconds. Methods that
+        # Expect some data right away can prevent next loop from sleeping
+        # by setting this event.
         self.sleep = threading.Event()
 
         self.status_lock = threading.Lock()
@@ -40,7 +45,7 @@ class TacoClients(threading.Thread):
         self.status_time = -1
         self.next_request = ""
 
-        self.clients = {}
+        self.client_sockets = {}
 
         self.next_rollcall = {}
         self.client_connect_time = {}
@@ -74,20 +79,14 @@ class TacoClients(threading.Thread):
             self.client_last_reply_time[peer_uuid] = time.time()
 
     def get_client_last_reply(self, peer_uuid):
+        """ Gets the last time a client was responsive or -1 if never seen. """
         with self.client_last_reply_time_lock:
             if peer_uuid in self.client_last_reply_time:
                 return self.client_last_reply_time[peer_uuid]
         return -1
 
-    def set_status(self, text, level=0):
-        if level == 1:
-            logger.info(text)
-        elif level == 0:
-            logger.debug(text)
-        elif level == 2:
-            logger.warning(text)
-        elif level == 3:
-            logger.error(text)
+    def set_status(self, text, level=logging.DEBUG):
+        logger.log(level, text)
         with self.status_lock:
             self.status = text
             self.status_time = time.time()
@@ -124,7 +123,7 @@ class TacoClients(threading.Thread):
         with self.app.file_request_output_queue_lock:
             self.app.file_request_output_queue[peer_uuid] = Queue()
 
-        self.clients[peer_uuid] = new_socket
+        self.client_sockets[peer_uuid] = new_socket
         return new_socket
 
     def run_peer(self, peer_uuid, client_ctx, private_dir, poller):
@@ -151,7 +150,7 @@ class TacoClients(threading.Thread):
             return
 
         # Is it already started?
-        if peer_uuid in self.clients.keys():
+        if peer_uuid in self.client_sockets.keys():
             return
 
         self.set_status("Starting Client for: %s" % peer_uuid)
@@ -187,7 +186,7 @@ class TacoClients(threading.Thread):
     def perform_peer(self, peer_uuid, poller):
         """ Called for connected peers to do some work. """
         logger.log(TRACE, 'peer %s is being processed...', peer_uuid)
-        peer_socket = self.clients[peer_uuid]
+        peer_socket = self.client_sockets[peer_uuid]
         self.perform_high_priority(peer_uuid, peer_socket)
         self.perform_medium_priority(peer_uuid, peer_socket)
         self.perform_file_transaction(peer_uuid, peer_socket)
@@ -199,9 +198,9 @@ class TacoClients(threading.Thread):
     def create(self):
         """ Called from run() to initialize the state at thread startup. """
         self.set_status("Client Startup")
-        self.set_status("Creating zmq Contexts", 1)
+        self.set_status("Creating zmq Contexts", logging.INFO)
         self.client_ctx = zmq.Context()
-        self.set_status("Starting zmq ThreadedAuthenticator", 1)
+        self.set_status("Starting zmq ThreadedAuthenticator", logging.INFO)
         # client_auth = zmq.auth.ThreadedAuthenticator(client_ctx)
         self.client_auth = ThreadAuthenticator(self.client_ctx)
         self.client_auth.start()
@@ -223,8 +222,8 @@ class TacoClients(threading.Thread):
 
     def terminate(self):
         self.set_status("Terminating Clients")
-        for peer_uuid in self.clients.keys():
-            self.clients[peer_uuid].close(0)
+        for peer_uuid in self.client_sockets.keys():
+            self.client_sockets[peer_uuid].close(0)
 
         self.set_status("Stopping zmq ThreadedAuthenticator")
         self.client_auth.stop()
@@ -254,11 +253,11 @@ class TacoClients(threading.Thread):
                 self.connect_block_time = time.time()
 
             # Anything to do?
-            if len(self.clients.keys()) == 0:
+            if len(self.client_sockets.keys()) == 0:
                 continue
 
             # We have some peers connected so shuffle them and let's roll.
-            peer_keys = list(self.clients.keys())
+            peer_keys = list(self.client_sockets.keys())
             random.shuffle(peer_keys)
             for peer_uuid in peer_keys:
                 self.perform_peer(peer_uuid, poller)
@@ -350,6 +349,7 @@ class TacoClients(threading.Thread):
 
         data = self.app.commands.request_rollcall_cmd()
         peer_socket.send_multipart([b'', data])
+        self.sleep.set()
         with self.app.upload_limiter_lock:
             self.app.upload_limiter.add(len(data))
         expect_answer = \
@@ -358,7 +358,6 @@ class TacoClients(threading.Thread):
         logger.log(TRACE, "hart-beat send to peer %s; "
                           "expected to answer until %r",
                    peer_uuid, expect_answer)
-        self.sleep.set()
 
     def receive_block(self, peer_uuid, peer_socket, poller):
         # RECEIVE BLOCK
@@ -399,18 +398,18 @@ class TacoClients(threading.Thread):
         Called when a peer failed to responds to hart-beat or we've seen
         socket errors.
 
-        The corresponding socket is removed from the pooler and is closed.
+        The corresponding socket is removed from the poller and is closed.
         Associated queues are all discarded and a reconnect is
         scheduled.
         """
         self.set_status(
             "Stopping client: %s -- %s" % (
                 peer_uuid, " and ".join(error_msg)),
-            2)
+            logging.WARNING)
 
         poller.unregister(peer_socket)
         peer_socket.close(0)
-        del self.clients[peer_uuid]
+        del self.client_sockets[peer_uuid]
         del self.client_timeout[peer_uuid]
 
         # Discard everything queued by this peer.

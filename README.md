@@ -55,13 +55,13 @@ To run it activate the environment and:
 How It Works
 ------------
 
-From an user's perspective the interface is accesses using the browser.
+From an user's perspective the interface is accessed using the browser.
 The application will create a small http server and it will inform you
 that is listening at http://127.0.0.1:5340/ in  default configuration.
 Point your browser to that address to get started.
 
 The program also connects directly to peers. When you first start there will
-be no peer. Install the program on a different computer (let's be hones, 
+be no peer. Install the program on a different computer (let's be honest, 
 you have no peer :smiling_imp:) and go to `Settings -> Add peer`. Keep in mind
 that this will not work out of the box if you ar behind a router; traffic
 needs to be directed to your computer through port forwarding; to avoid 

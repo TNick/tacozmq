@@ -54,11 +54,8 @@ class TacoServer(threading.Thread):
                 return self.client_last_request_time[peer_uuid]
         return -1
 
-    def set_status(self, text, level=0):
-        if level == 0:
-            logger.info(text)
-        elif level == 1:
-            logger.debug(text)
+    def set_status(self, text, level=logging.INFO):
+        logger.log(level, text)
         with self.status_lock:
             self.status = text
             self.status_time = time.time()
@@ -71,10 +68,10 @@ class TacoServer(threading.Thread):
         """ Called from run() to initialize the state at thread startup. """
         self.set_status("Server Startup")
 
-        self.set_status("Creating zmq Context", 1)
+        self.set_status("Creating zmq Context", logging.DEBUG)
         self.server_ctx = zmq.Context()
 
-        self.set_status("Starting zmq ThreadedAuthenticator", 1)
+        self.set_status("Starting zmq ThreadedAuthenticator", logging.DEBUG)
         self.server_auth = ThreadAuthenticator(self.server_ctx)
         self.server_auth.start()
 
@@ -92,11 +89,11 @@ class TacoServer(threading.Thread):
             "Configuring Curve to use public key dir:" + public_dir)
         self.server_auth.configure_curve(domain='*', location=private_dir)
 
-        self.set_status("Creating Server Context...", 1)
+        self.set_status("Creating Server Context...", logging.DEBUG)
         socket = self.server_ctx.socket(zmq.REP)
         socket.setsockopt(zmq.LINGER, 0)
 
-        self.set_status("Loading Server Certs...", 1)
+        self.set_status("Loading Server Certs...", logging.DEBUG)
         server_public, server_secret = zmq.auth.load_certificate(
             norm_join(private_dir,
                       KEY_GENERATION_PREFIX + "-server.key_secret"))
@@ -151,7 +148,6 @@ class TacoServer(threading.Thread):
             socks = dict(poller.poll(10))
             if self.socket in socks and socks[self.socket] == zmq.POLLOUT:
                 logger.log(TRACE, 'responding to client_uuid %s', client_uuid)
-                # self.set_status("Replying to a request")
                 with self.app.upload_limiter_lock:
                     self.app.upload_limiter.add(len(reply))
                 self.socket.send(reply)
