@@ -299,9 +299,9 @@ def settings_save(jdata, app):
         if len(data) >= 0:
             with app.settings_lock:
                 logger.info("API Access: SETTINGS -- Action: SAVE")
-                for (keyname, value) in data:
-                    app.settings[keyname] = value
-                app.store.Save_Settings(False)
+                for (key_name, value) in data:
+                    app.settings[key_name] = value
+                app.store.save(False)
                 return 1
     return -1
 
@@ -316,7 +316,7 @@ def share_save(jdata, app):
                 app.settings["Shares"] = []
                 for (sharename, sharelocation) in data:
                     app.settings["Shares"].append([sharename, sharelocation])
-                app.store.Save_Settings(False)
+                app.store.save(False)
                 return 1
     return -1
 
@@ -376,7 +376,7 @@ def peer_save(jdata, app):
                         "clientkey": client_pub,
                         "serverkey": server_pub
                     }
-                app.store.Save_Settings(False)
+                app.store.save(False)
             app.restart()
             return 1
     return -1

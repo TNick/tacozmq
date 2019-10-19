@@ -15,56 +15,64 @@ from os.path import isfile
 
 from taco.utils import norm_path, norm_join
 
+logger = logging.getLogger('tacozmq.crypto')
 
-def Init_Local_Crypto(app):
-    logging.debug("Started")
+
+def init_local_crypto(app):
+    logger.debug("initializing local cryptographic keys...")
     with app.settings_lock:
-        workingdir = app.settings["TacoNET Certificates Store"]
-        privatedir = norm_path(
-            app.settings["TacoNET Certificates Store"] + "/" + app.settings[
-                "Local UUID"] + "/private/")
-        publicdir = norm_path(
-            app.settings["TacoNET Certificates Store"] + "/" + app.settings[
-                "Local UUID"] + "/public/")
+        working_dir = app.settings["TacoNET Certificates Store"]
+        private_dir = app.private_dir
+        public_dir = app.public_dir
 
-    if not os.path.isdir(privatedir):
-        os.makedirs(privatedir)
-    if not os.path.isdir(publicdir):
-        os.makedirs(publicdir)
+    if not os.path.isdir(private_dir):
+        os.makedirs(private_dir)
+    if not os.path.isdir(public_dir):
+        os.makedirs(public_dir)
 
-    server_cert = norm_join(privatedir,
-                            KEY_GENERATION_PREFIX + "-server.key")
-    server_key = norm_join(privatedir,
-                           KEY_GENERATION_PREFIX + "-server.key_secret")
+    server_cert = norm_join(private_dir,
+                            '%s-%s' % (
+                               KEY_GENERATION_PREFIX,
+                               KEY_SERVER_PUBLIC_SUFFIX))
+    server_key = norm_join(private_dir,
+                           '%s-%s' % (
+                               KEY_GENERATION_PREFIX,
+                               KEY_SERVER_SECRET_SUFFIX))
     server_generate = not (isfile(server_cert) and isfile(server_key))
 
-    client_cert = norm_join(privatedir,
-                            KEY_GENERATION_PREFIX + "-client.key")
-    client_key = norm_join(privatedir,
-                           KEY_GENERATION_PREFIX + "-client.key_secret")
+    client_cert = norm_join(private_dir,
+                            '%s-%s' % (
+                                KEY_GENERATION_PREFIX,
+                                KEY_CLIENT_PUBLIC_SUFFIX))
+    client_key = norm_join(private_dir,
+                           '%s-%s' % (
+                               KEY_GENERATION_PREFIX,
+                               KEY_CLIENT_SECRET_SUFFIX))
     client_generate = not (isfile(client_cert) and isfile(client_key))
 
     if server_generate:
-        logging.info("Server CURVE Public or Private Key Missing, Generating")
-        server_public_file, server_secret_file = zmq.auth.create_certificates(
-            workingdir,
-            KEY_GENERATION_PREFIX + "-server")
-        shutil.move(norm_path(server_public_file), norm_path(privatedir))
-        shutil.move(norm_path(server_secret_file), norm_path(privatedir))
+        logger.info("Server CURVE Public or Private Key Missing, Generating")
+        server_public_file, server_secret_file = \
+            zmq.auth.create_certificates(
+                working_dir,
+                KEY_GENERATION_PREFIX + "-server")
+        shutil.move(norm_path(server_public_file), private_dir)
+        shutil.move(norm_path(server_secret_file), private_dir)
     if client_generate:
-        logging.info("Client CURVE Public or Private Key Missing, Generating")
-        client_public_file, client_secret_file = zmq.auth.create_certificates(
-            workingdir,
-            KEY_GENERATION_PREFIX + "-client")
-        shutil.move(norm_path(client_public_file), norm_path(privatedir))
-        shutil.move(norm_path(client_secret_file), norm_path(privatedir))
+        logger.info("Client CURVE Public or Private Key Missing, Generating")
+        client_public_file, client_secret_file = \
+            zmq.auth.create_certificates(
+                working_dir,
+                KEY_GENERATION_PREFIX + "-client")
+        shutil.move(norm_path(client_public_file), private_dir)
+        shutil.move(norm_path(client_secret_file), private_dir)
 
-    logging.debug("Getting keys into globals")
+    logger.debug("getting cryptographic keys into globals...")
 
     with open(client_cert, 'r') as fin:
-        client_public_key = s = fin.read()
+        client_public_key = fin.read()
     with open(server_cert, 'r') as fin:
-        server_public_key = s = fin.read()
+        server_public_key = fin.read()
 
     with app.public_keys_lock:
         data = re.search(r'.*public-key = "(.+)"',
@@ -77,4 +85,4 @@ def Init_Local_Crypto(app):
         assert data
         app.public_keys["server"] = data.group(1)
 
-    logging.debug("Finished")
+    logger.debug("local cryptographic keys initialized")

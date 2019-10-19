@@ -10,18 +10,32 @@ import logging
 import time
 import zmq
 from zmq.auth.thread import ThreadAuthenticator
-import os
 
-from taco.constants import KEY_GENERATION_PREFIX
-from taco.utils import norm_path, norm_join
-
+from taco.constants import KEY_GENERATION_PREFIX, KEY_SERVER_SECRET_SUFFIX
+from .utils import event_monitor, norm_join
 from .constants import TRACE, NO_IDENTITY
+
 
 logger = logging.getLogger('tacozmq.server')
 
 
 class TacoServer(threading.Thread):
-    """ A thread that manages our reply server. """
+    """
+    A thread that manages our reply server.
+
+    This is a "server" according to the
+    [zmq_curve](http://api.zeromq.org/4-1:zmq-curve) which states that:
+    > A socket using CURVE can be either client or server,
+    > at any moment, but not both.
+    > The role is independent of bind/connect direction.
+
+    To become a CURVE server, the application sets the ZMQ_CURVE_SERVER
+    option on the socket, and then sets the ZMQ_CURVE_SECRETKEY option
+    to provide the socket with its long-term secret key.
+    The application does not provide the socket with its long-term public key,
+    which is used only by clients.
+
+    """
     def __init__(self, app, bind_ip, bind_port):
         """
         Constructor.
@@ -32,13 +46,13 @@ class TacoServer(threading.Thread):
         """
         logger.debug('server %r:%r is being constructed...',
                      bind_ip, bind_port)
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name="thTacoServer")
         self.app = app
 
         # TODO: in current implementation this may be None
         # as this only gets the parameters from command line.
         # If there were no parameters then - at start of thread -
-        # these are read from settings. I see no reason for this.
+        # these are read from settings. I see no reason for delaying this.
         self.bind_ip = bind_ip
         self.bind_port = bind_port
 
@@ -52,10 +66,30 @@ class TacoServer(threading.Thread):
         self.client_last_request_time = {}
         self.client_last_request_time_lock = threading.Lock()
 
+        # We keep an integer in settings that tracks the number of times
+        # the settings were saved. Inhere we store the value of that
+        # integer last time we inspected the settings and we use
+        # settings_changed() whn we see a discrepancy.
+        self.settings_trace_number = 1
+
         self.server_ctx = None
         self.server_auth = None
         self.socket = None
         logger.debug('server constructed')
+
+    def settings_changed(self):
+        """ Called when we detect a change in settings. """
+        self.settings_trace_number = self.app.store.trace_number
+
+        if not self.app.no_encryption:
+            with self.app.settings_lock:
+                public_dir = self.app.public_dir
+            self.set_status("Configuring Curve to use private key dir: %s" %
+                            public_dir)
+            # Certificates can be added and removed in directory at any time.
+            # configure_curve must be called every time certificates are added
+            # or removed, in order to update the Authenticator’s state.
+            self.server_auth.configure_curve(domain='*', location=public_dir)
 
     def set_client_last_request(self, peer_uuid):
         logger.log(TRACE, 'server has serviced a request from: %s', peer_uuid)
@@ -85,42 +119,64 @@ class TacoServer(threading.Thread):
         self.set_status("Creating zmq Context", logging.DEBUG)
         self.server_ctx = zmq.Context()
 
-        self.set_status("Starting zmq ThreadedAuthenticator", logging.DEBUG)
-        self.server_auth = ThreadAuthenticator(self.server_ctx)
-        self.server_auth.start()
-
         with self.app.settings_lock:
             if self.bind_ip is None:
                 self.bind_ip = self.app.settings["Application IP"]
             if self.bind_port is None:
                 self.bind_port = self.app.settings["Application Port"]
-            local_uuid = self.app.settings["Local UUID"]
-            store_path = self.app.settings["TacoNET Certificates Store"]
-        public_dir = norm_join(store_path, local_uuid, "public")
-        private_dir = norm_join(store_path, local_uuid, "private")
-
-        self.set_status(
-            "Configuring Curve to use public key dir:" + public_dir)
-        self.server_auth.configure_curve(domain='*', location=private_dir)
+            public_dir = self.app.public_dir
+            private_dir = self.app.private_dir
 
         self.set_status("Creating Server Context...", logging.DEBUG)
         socket = self.server_ctx.socket(zmq.REP)
         socket.setsockopt(zmq.LINGER, 0)
 
-        self.set_status("Loading Server Certs...", logging.DEBUG)
-        server_public, server_secret = zmq.auth.load_certificate(
-            norm_join(private_dir,
-                      KEY_GENERATION_PREFIX + "-server.key_secret"))
-        socket.curve_secretkey = server_secret
-        socket.curve_publickey = server_public
+        if not self.app.no_encryption:
+            self.set_status("Starting zmq ThreadedAuthenticator",
+                            logging.DEBUG)
+            self.server_auth = ThreadAuthenticator(
+                self.server_ctx, log=logging.getLogger('tacozmq.s_auth'))
+            self.server_auth.start()
+            self.server_auth.thread.name = "thTacoServerAuth"
 
-        socket.curve_server = True
+            self.set_status(
+                "Configuring Curve to use public key dir: %s" % public_dir)
+            self.server_auth.configure_curve(domain='*', location=public_dir)
+
+            self.set_status("Loading Server Certs...", logging.DEBUG)
+            server_public, server_secret = zmq.auth.load_certificate(
+                norm_join(private_dir,
+                          '%s-%s' % (
+                              KEY_GENERATION_PREFIX,
+                              KEY_SERVER_SECRET_SUFFIX)))
+
+            # To become a CURVE server, the application sets the ZMQ_CURVE_SERVER
+            # option on the socket,
+            socket.curve_server = True
+
+            # and then sets the ZMQ_CURVE_SECRETKEY option
+            # to provide the socket with its long-term secret key.
+            socket.curve_secretkey = server_secret
+
+            # The application does not provide the socket with
+            # its long-term public key, which is used only by clients.
+            # socket.curve_publickey = server_public
+
         if self.bind_ip == "0.0.0.0":
             self.bind_ip = "*"
         address = "tcp://%s:%d" % (self.bind_ip, self.bind_port)
         self.set_status("Server is now listening for encrypted "
                         "ZMQ connections @ %s" % address)
         socket.bind(address)
+
+        # We can enable monitoring at zmq level.
+        if self.app.zmq_monitor:
+            t = threading.Thread(
+                name = "thTacoSeMon",
+                target=event_monitor,
+                args=(socket.get_monitor_socket(),))
+            t.start()
+
         self.socket = socket
         logger.debug("created")
 
@@ -128,25 +184,31 @@ class TacoServer(threading.Thread):
         """ Called from run() to terminat the state at thread finish. """
         self.set_status("Stopping zmq server with 0 second linger")
         self.socket.close(0)
-        self.set_status("Stopping zmq ThreadedAuthenticator")
-        self.server_auth.stop()
-        self.server_ctx.term()
-        self.set_status("Server Exit")
-        self.server_ctx = None
-        self.server_auth = None
         self.socket = None
-        logger.debug("terminated")
+        self.set_status("Stopping zmq ThreadedAuthenticator")
+        if self.server_auth is not None:
+            self.server_auth.stop()
+            self.server_auth = None
+        self.server_ctx.term()
+        self.server_ctx = None
+        self.set_status("Server Exit")
 
     def run(self):
         self.create()
-
         poller = zmq.Poller()
         poller.register(self.socket, zmq.POLLIN | zmq.POLLOUT)
 
         while not self.stop.is_set():
             reply = ""
-            socks = dict(poller.poll(200))
+            try:
+                socks = dict(poller.poll(200))
+            except zmq.ZMQError:
+                logger.error("Error while polling sockets", exc_info=True)
+                socks = {}
             logger.log(TRACE, 'cycle start with %d active sockets', len(socks))
+
+            if self.settings_trace_number != self.app.store.trace_number:
+                self.settings_changed()
 
             if self.socket in socks and socks[self.socket] == zmq.POLLIN:
                 data = self.socket.recv()
@@ -159,7 +221,12 @@ class TacoServer(threading.Thread):
                 if client_uuid != NO_IDENTITY:
                     self.set_client_last_request(client_uuid)
 
-            socks = dict(poller.poll(10))
+            try:
+                socks = dict(poller.poll(10))
+            except zmq.ZMQError:
+                logger.error("Error while polling sockets", exc_info=True)
+                socks = {}
+
             if self.socket in socks and socks[self.socket] == zmq.POLLOUT:
                 logger.log(TRACE, 'responding to client_uuid %s', client_uuid)
                 with self.app.upload_limiter_lock:

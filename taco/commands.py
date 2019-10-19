@@ -203,7 +203,7 @@ class TacoCommands(object):
                     if peer_data["nickname"] != new_nickname:
                         if NICKNAME_CHECKER.match(new_nickname):
                             peer_data["nickname"] = new_nickname
-                            self.app.store.Save_Settings(False)
+                            self.app.store.save(False)
                             logger.log(TRACE, "peer %s nickname updated to %s",
                                        peer_uuid, new_nickname)
                         else:
@@ -214,14 +214,14 @@ class TacoCommands(object):
                         peer_data["nickname"] = new_nickname
                     else:
                         peer_data["nickname"] = "GENERIC NICKNAME"
-                    self.app.store.Save_Settings(False)
+                    self.app.store.save(False)
             else:
                 logger.log(TRACE, "peer %s not in list", peer_uuid)
 
             for peer_id in unpacked[1:]:
                 if UUID_CHECKER.match(peer_id):
                     if peer_id not in self.app.settings["Peers"].keys() \
-                            and peer_id != self.app.settings[ "Local UUID"]:
+                            and peer_id != self.app.settings["Local UUID"]:
                         requested_peers.append(peer_id)
         logger.log(TRACE, "%d requested peers", len(requested_peers))
         if len(requested_peers) > 0:
@@ -280,7 +280,7 @@ class TacoCommands(object):
                         "localnick": "",
                         "nickname": nickname
                     }
-                    self.app.store.Save_Settings(False)
+                    self.app.store.save(False)
                 else:
                     # TODO: shouldn't we try to check/update some values?
                     logger.log(TRACE, "peer %r exists: %r",

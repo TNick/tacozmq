@@ -84,6 +84,14 @@ def make_argument_parser():
         "--version", default=False,
         action="store_true",
         help="print program version and exit")
+    parser.add_argument(
+        "--disable-encryption", default=False, dest='disable_encryption',
+        action="store_true",
+        help="just don't use this")
+    parser.add_argument(
+        "--enable-encryption", default=False, dest='disable_encryption',
+        action="store_false",
+        help="encryption is on by default")
 
     return parser
 
@@ -112,11 +120,11 @@ def setup_logging(args):
             return False
     args.log_level = log_level
 
-    # The format we're going to use in all handlers.
+    # The format we're going to use with console output.
     fmt = logging.Formatter(
-        "[%(levelname)s] %(asctime)s %(filename)s:%(lineno)d "
-        "[%(funcName)s] %(message)s",
-        '%Y-%m-%d %H:%M:%S')
+        "[%(asctime)s] [%(levelname)-7s] [%(name)-19s] [%(threadName)-15s] "
+        "[%(funcName)-25s] %(message)s",
+        '%M:%S')
 
     # This is the console output.
     console_handler = logging.StreamHandler()
@@ -126,6 +134,12 @@ def setup_logging(args):
 
     # This is the file output.
     if len(args.log_file) > 0 and args.log_file != '-':
+        # The format we're going to use with file handler.
+        fmt = logging.Formatter(
+            "%(asctime)5s [%(levelname)-7s] [%(name)-19s] "
+            "[%(filename)15s:%(lineno)-4d] [%(threadName)-15s] "
+            "[%(funcName)-25s] | %(message)s",
+            '%Y-%m-%d %H:%M:%S')
         file_path, file_name = os.path.split(args.log_file)
         if not os.path.isdir(file_path):
             os.makedirs(file_path)
@@ -173,7 +187,11 @@ def main():
 
     # Start the application.
     from taco.globals import TacoApp
-    app = TacoApp(args.app_addr, args.app_port)
+    app = TacoApp(
+        args.app_addr, args.app_port,
+        no_encryption=args.disable_encryption,
+        zmq_monitor=args.log_level<3
+    )
     return app.start(
         host=args.web_addr,
         port=args.web_port,

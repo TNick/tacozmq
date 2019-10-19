@@ -11,7 +11,7 @@ import taco.constants
 import logging
 import uuid
 
-from .utils import ShutDownException
+from .utils import ShutDownException, norm_join
 
 logger = logging.getLogger('tacozmq.app')
 
@@ -71,16 +71,19 @@ class TacoApp(object):
     low_priority_output_queue = {}
     file_request_output_queue = {}
 
-    def __init__(self, host=None, port=None):
+    def __init__(self, host=None, port=None, no_encryption=False,
+                 zmq_monitor=False):
         super(TacoApp, self).__init__()
         TacoApp.instance = self
+        self.no_encryption = no_encryption
+        self.zmq_monitor = zmq_monitor
 
         from taco.settings import TacoSettings
         self.store = TacoSettings(self)
-        self.store.Load_Settings()
+        self.store.load()
 
-        from taco.crypto import Init_Local_Crypto
-        Init_Local_Crypto(self)
+        from taco.crypto import init_local_crypto
+        init_local_crypto(self)
 
         from taco.limiter import Speedometer
         self.upload_limiter = Speedometer()
@@ -244,6 +247,20 @@ class TacoApp(object):
         self.filesys = None
         logger.debug("Dispatcher Stopped Successfully")
         logger.info("Clean Exit")
+
+    @property
+    def public_dir(self):
+        return norm_join(
+            self.settings["TacoNET Certificates Store"],
+            self.settings["Local UUID"],
+            "public")
+
+    @property
+    def private_dir(self):
+        return norm_join(
+            self.settings["TacoNET Certificates Store"],
+            self.settings["Local UUID"],
+            "private")
 
 
 def proper_exit(signum, frame):

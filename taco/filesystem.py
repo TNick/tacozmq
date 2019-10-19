@@ -73,7 +73,7 @@ def Convert_Share_To_Path(app, share):
 
 class TacoFilesystemManager(threading.Thread):
     def __init__(self, app):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name="thTacoFS")
         self.app = app
 
         self.stop = threading.Event()
@@ -142,9 +142,10 @@ class TacoFilesystemManager(threading.Thread):
             (chunk_uuid, file_offset) = \
                 self.client_downloading_pending_chunks[peer_uuid].pop()
             self.set_status(
-                "Credits Free:" +
-                str((share_dir, file_name, file_size,
-                     file_mod, chunk_uuid, file_offset)))
+                "Credits free: share_dir=%r, file_name=%r, file_size=%r, "
+                "file_mod=%r, chunk_uuid=%r, file_offset=%r" % (
+                    share_dir, file_name, file_size,
+                    file_mod, chunk_uuid, file_offset))
 
             request = self.app.commands.request_get_file_chunk_cmd(
                 share_dir, file_name, file_offset, chunk_uuid)
@@ -164,7 +165,7 @@ class TacoFilesystemManager(threading.Thread):
         if incoming < 0 or outgoing < 0:
             self.set_status(
                 "I have items in the download queue, "
-                "but client has never been contactable: " + peer_uuid)
+                "but client has never been contactable: %r", peer_uuid)
             return
 
         if \
@@ -173,13 +174,13 @@ class TacoFilesystemManager(threading.Thread):
 
             self.set_status(
                 "I have items in the download queue, "
-                "but client has timed out rollcalls: " + peer_uuid)
+                "but client has timed out rollcalls: %r", peer_uuid)
             return
 
         # The peer is responsive.
 
         if len(self.app.download_q[peer_uuid]) == 0:
-            self.set_status("Download Q empty for: " + peer_uuid)
+            self.set_status("Download Q empty for: %r" % peer_uuid)
             self.client_downloading[peer_uuid] = 0
             del self.app.download_q[peer_uuid]
             self.client_downloading_pending_chunks[peer_uuid] = []
@@ -195,8 +196,10 @@ class TacoFilesystemManager(threading.Thread):
 
         if self.client_downloading[peer_uuid] != (share_dir, file_name, file_size, file_mod):
             self.set_status(
-                "Need to check on the file we should be downloading:" + str(
-                    (peer_uuid, share_dir, file_name, file_size, file_mod)))
+                "Need to check on the file we should be downloading: "
+                "peer_uuid=%r, share_dir=%r, file_name=%r, "
+                "file_size=%r, file_mod=%r" % (
+                    peer_uuid, share_dir, file_name, file_size, file_mod))
             self.client_downloading[peer_uuid] = (share_dir, file_name, file_size, file_mod)
             self.client_downloading_pending_chunks[peer_uuid] = []
             self.client_downloading_requested_chunks[peer_uuid] = []
@@ -491,7 +494,7 @@ class TacoFilesystemManager(threading.Thread):
 
 class TacoFilesystemWorker(threading.Thread):
     def __init__(self, app, worker_id):
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name="thTacoFS-%r" % worker_id)
         self.app = app
 
         self.stop = threading.Event()

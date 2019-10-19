@@ -38,6 +38,11 @@ JSON_SETTINGS_FILENAME = "settings.json"
 CERT_STORE_DIR = "certstore/"
 
 KEY_GENERATION_PREFIX = "taconet"  # needs to be changed later
+KEY_CLIENT_SECRET_SUFFIX = "client.key_secret"
+KEY_SERVER_SECRET_SUFFIX = "server.key_secret"
+KEY_CLIENT_PUBLIC_SUFFIX = "client.key"
+KEY_SERVER_PUBLIC_SUFFIX = "server.key"
+
 
 LOOP_TOKEN_COUNT = 250
 

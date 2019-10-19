@@ -5,7 +5,7 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
   console.log("Get_Share_Listing_Results: " + sharedir);
   $("#sharelisting").html("");
   $("#loaderthing").removeClass("hide");
-  if ($failcount > 200) 
+  if ($failcount > 200)
   {
      $("#loaderthing").addClass("hide");
      $("#timedout").fadeIn();
@@ -15,11 +15,11 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
     var $api_action = {"action":"browseresult","data":{"uuid":peer_uuid,"sharedir":sharedir}};
     $.ajax({url:"/api.post",type:"POST",data:JSON.stringify($api_action),contentType:"application/json; charset=utf-8",dataType:"json",error: API_Alert,success: function(data)
       {
-        if ("result" in data) 
-        { 
+        if ("result" in data)
+        {
           $("#loaderthing").addClass("hide");
           sharelisting = [];
-          if (sharedir.length > 1) 
+          if (sharedir.length > 1)
           {
             updir = sharedir.split('/');
             updir.pop();
@@ -31,9 +31,9 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
             sharelisting.push(thestring);
           }
 
-          for (var i = 0; i < data["result"][1].length; i++) 
+          for (var i = 0; i < data["result"][1].length; i++)
           {
-            if (sharedir=="/") { 
+            if (sharedir=="/") {
               thestring = '<li data-uuid="'+peer_uuid+'" data-sharedir="'+btoa(sharedir+data["result"][1][i])+'" class="shareclick list-group-item">';
               thestring += '<span class="glyphicon glyphicon-bookmark"></span> <strong>'+data["result"][1][i]+'</strong>';
             }
@@ -48,7 +48,7 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
             thestring += '</li>';
             sharelisting.push(thestring);
           }
-          filelisting = [];
+          file_listing = [];
           for (var i = 0; i < data["result"][2].length; i++)
           {
             thestring  = '<li data-uuid="'+peer_uuid+'" data-sharedir="'+btoa(sharedir)+'" data-filename="'+btoa(data["result"][2][i][0])+'" data-size="'+data["result"][2][i][1]+'" data-mod="'+data["result"][2][i][2]+'" class="fileclick list-group-item">';
@@ -58,13 +58,13 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
             thestring += '<span class="glyphicon glyphicon-file"></span> <strong>'+data["result"][2][i][0]+'</strong> <span style="float:right">'+commify(data["result"][2][i][1])+' bytes</span>';
             thestring += '</li>';
             sharelisting.push(thestring);
-          } 
+          }
 
-          
+
           $outputhtml  = '';
           $outputhtml += '<ul class="list-group">';
           $outputhtml += sharelisting.join("");
-          $outputhtml += filelisting.join("");
+          $outputhtml += file_listing.join("");
           $outputhtml += '</ul>';
           if (sharelisting.length > 0)
           {
@@ -74,8 +74,8 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
               {
                 $(this).html($outputhtml);
                 $failcount = 0;
-                $(".shareclick").unbind("click").click(function() 
-                { 
+                $(".shareclick").unbind("click").click(function()
+                {
                   l_uuid = $(this).data("uuid");
                   l_sharedir = atob($(this).data("sharedir"));
                   var $api_action = {"action":"browse","data":{"uuid":$(this).data("uuid"),"sharedir":atob($(this).data("sharedir"))}};
@@ -85,7 +85,7 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
                     }
                   });
                 });
-                $(".fileaddtoq").unbind("click").click(function(event) 
+                $(".fileaddtoq").unbind("click").click(function(event)
                 {
                   event.stopPropagation();
                   filename=$(this).closest(".fileclick").data("filename");
@@ -102,7 +102,7 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
                     else if (data == 2) { buttonthis.find("span").toggleClass("spinner glyphicon-refresh glyphicon-ok"); buttonthis.unbind("click"); buttonthis.toggleClass("btn-info"); }
                     else { buttonthis.find("span").toggleClass("spinner glyphicon-refresh glyphicon-remove"); buttonthis.unbind("click"); buttonthis.toggleClass("btn-danger"); }
                   }});
-  
+
                 });
                 $(this).fadeIn();
               });
@@ -113,10 +113,10 @@ function Get_Share_Listing_Results(peer_uuid,sharedir)
             $("#noshares").fadeIn();
           }
 
-        } 
-        else 
-        { 
-          $failcount++; 
+        }
+        else
+        {
+          $failcount++;
           setTimeout(function() { Get_Share_Listing_Results(peer_uuid,sharedir) },100);
         }
       }
@@ -140,7 +140,7 @@ function Show_Peer_Shares(nickname,localnick,peer_uuid)
   $("#sharelisting").removeClass("hide");
   $("#loaderthing").removeClass("hide");
   $("#peercrumb").slideDown(150);
-  $("#peerrootcrumb").unbind("click").click(function () 
+  $("#peerrootcrumb").unbind("click").click(function ()
   {
     $("#sharelisting").fadeOut(200,function() {
     Show_Peer_Shares(nickname,localnick,peer_uuid);
@@ -162,7 +162,7 @@ function Set_Up_Root_Peer_Names()
   $.ajax({url:"/api.post",type:"POST",data:JSON.stringify($api_action),contentType:"application/json; charset=utf-8",dataType:"json",error: API_Alert,success: function(data)
     {
       listing = [];
-      for (var $uuid in data) 
+      for (var $uuid in data)
       {
           inc = data[$uuid][0];
           out = data[$uuid][1];
@@ -179,21 +179,21 @@ function Set_Up_Root_Peer_Names()
             listing.push(thestring);
           }
       }
-     
-      
+
+
       if (listing.length > 0)
       {
         $("#loaderthing").addClass("hide");
-        $("#nopeers").fadeOut(function() 
+        $("#nopeers").fadeOut(function()
         {
           $outputhtml  = '';
           $outputhtml += '<ul class="list-group">';
           $outputhtml += listing.join("");
           $outputhtml += '</ul>';
-          
-          if ($("#peerlisting").html() != $outputhtml) 
-          { 
-            $("#peerlisting").fadeOut(function() 
+
+          if ($("#peerlisting").html() != $outputhtml)
+          {
+            $("#peerlisting").fadeOut(function()
             {
               $(this).html($outputhtml);
               $(".peerclick").unbind("click").click(function()
@@ -224,5 +224,5 @@ function Set_Up_Root_Peer_Names()
 $( document ).ready(function() {
   Set_Up_Root_Peer_Names();
   Check_For_API_Errors();
-  
+
 });
