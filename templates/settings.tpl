@@ -170,7 +170,7 @@
       </div>
 
       <div class="input-group"><span class="input-group-addon"><span data-trigger="hover" data-container="body" data-placement="right" data-content="The location you want to save downloaded files" class="glyphicon glyphicon-info-sign"></span><span class="iga-fixed-width">Download Location</span></span>
-      <input autocomplete="off" id="setting-downloadlocation" readonly="readonly" type="text" class="form-control" value="{{os.path.normpath(os.path.abspath(local_settings_copy["Download Location"]))}}"><span class="input-group-btn"><button id="browsedownload" class="btn btn-default" type="button"><span class="glyphicon glyphicon-folder-open"></span>&nbsp Browse</button></span></div>
+      <input autocomplete="off" id="setting-downloadlocation" readonly="readonly" type="text" class="form-control" value="{{os.path.normpath(os.path.abspath(local_settings_copy["Download Location"]))}}"><span class="input-group-btn"><button id="browsedownload" class="btn btn-default" type="button"><span class="glyphicon glyphicon-folder-open"></span>&nbsp; Browse</button></span></div>
 
       <div class="alert alert-warning alert-dismissable alert-tweak hide" id="setting-appip-alert"><button type="button" class="close">&times;</button><strong>Warning!</strong> You must specify the ip in numeric form only. <span class="glyphicon glyphicon-hand-down"></span></div>
       <div class="input-group"><span class="input-group-addon"><span data-trigger="hover" data-container="body" data-placement="right" data-content="The IP address that the {{taco.constants.APP_NAME}} application server will bind to. If you are unaware of what that means, it is best to leave it as the default of '0.0.0.0'" class="glyphicon glyphicon-info-sign"></span><span class="iga-fixed-width">Application IP</span></span>
@@ -197,11 +197,11 @@
       <input autocomplete="off" id="setting-uplimit" type="text" class="form-control" value="{{local_settings_copy["Upload Limit"]}}"></div>
 
       <div class="input-group"><span class="input-group-addon"><span data-trigger="hover" data-container="body" data-placement="right" data-content="The location your want to store your public and private certificates for use with your personal {{taco.constants.APP_NAME}} instance. If you are unaware of publickey cryptography concepts, it's best to just leave this the default." class="glyphicon glyphicon-info-sign"></span><span class="iga-fixed-width">Certificate Store</span></span>
-      <input autocomplete="off" id="setting-certlocation" readonly="readonly" type="text" class="form-control" value="{{os.path.normpath(os.path.abspath(local_settings_copy["TacoNET Certificates Store"]))}}"><span class="input-group-btn"><button id="browsecert" class="btn btn-default" type="button"><span class="glyphicon glyphicon-folder-open"></span>&nbsp Browse</button></span></div>
+      <input autocomplete="off" id="setting-certlocation" readonly="readonly" type="text" class="form-control" value="{{os.path.normpath(os.path.abspath(local_settings_copy["TacoNET Certificates Store"]))}}"><span class="input-group-btn"><button id="browsecert" class="btn btn-default" type="button"><span class="glyphicon glyphicon-folder-open"></span>&nbsp; Browse</button></span></div>
 
     </div>
     <div class="panel-footer text-right">
-      <span id="settings-saving" class="label label-info hide">Saving Settings... <img src="/static/images/ajax_loader.gif"></span>
+      <span id="settings-saving" class="label label-info hide">Saving Settings... <img src="/static/images/ajax_loader.gif" alt="loading..."></span>
       <span id="settings-saved" class="label label-success hide">Settings Saved</span>
       <span id="settings-unsaved" class="label label-danger hide">Unsaved Settings</span>
       <span id="settings-errors" class="label label-danger hide">You have errors your must correct</span>
@@ -245,7 +245,7 @@
     %end
     </div>
     <div class="panel-footer text-right">
-      <span id="shares-saving" class="label label-info hide">Saving Settings... <img src="/static/images/ajax_loader.gif"></span>
+      <span id="shares-saving" class="label label-info hide">Saving Settings... <img src="/static/images/ajax_loader.gif" alt="loading..."></span>
       <span id="shares-saved" class="label label-success hide">Settings Saved</span>
       <span id="shares-unsaved" class="label label-danger hide">Unsaved Settings</span>
       <button id="add-share" type="button" class="btn btn-default"><span class="glyphicon glyphicon-plus"></span> Add Share</button>
@@ -268,13 +268,13 @@
                 <h4><span class="glyphicon glyphicon-user"></span> <span class="peernick">Peer Nickname</span></h4>
 
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peerhostbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The hostname you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
-                <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Hostname or IP</span></span><input autocomplete="off" type="text" class="form-control peerhost" placeholder="External Hostname" value=""><span class="input-group-addon">Dynamic? <input class='peerdynamic' type="checkbox"></input></span></div>
+                <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Hostname or IP</span></span><input autocomplete="off" type="text" class="form-control peerhost" placeholder="External Hostname" value=""><span class="input-group-addon">Dynamic? <input class='peerdynamic' type="checkbox"></span></div>
 
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peerportbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The port you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
                 <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Port</span></span><input autocomplete="off" type="text" class="form-control peerport" placeholder="External Port" value=""></div>
 
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peernickbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The local nickname you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
-                <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Port</span>Local Nickname</span></span><input autocomplete="off" type="text" class="form-control peerlocalnick" placeholder="Local Nickname"></div>
+                <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Port</span>Local Nickname</span><input autocomplete="off" type="text" class="form-control peerlocalnick" placeholder="Local Nickname"></div>
                 <div class="advanced-options">
 
                   <div class="alert alert-warning alert-dismissable alert-tweak hide peeruuidbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The UUID you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
@@ -315,7 +315,7 @@
                 <h4><span class="glyphicon glyphicon-user"></span> <span class="peernick">{{local_settings_copy["Peers"][p_uuid]["nickname"] if "nickname" in local_settings_copy["Peers"][p_uuid] else "Peer Nickname"}}</span></h4>
 
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peerhostbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The hostname you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
-                <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Hostname or IP</span></span><input autocomplete="off" type="text" class="form-control peerhost" placeholder="External Hostname" value="{{local_settings_copy["Peers"][p_uuid]["hostname"]}}"><span class="input-group-addon">Dynamic? <input class='peerdynamic' type="checkbox" {{"checked='yes'" if local_settings_copy["Peers"][p_uuid]["dynamic"] else ""}}></input></span></div>
+                <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Hostname or IP</span></span><input autocomplete="off" type="text" class="form-control peerhost" placeholder="External Hostname" value="{{local_settings_copy["Peers"][p_uuid]["hostname"]}}"><span class="input-group-addon">Dynamic? <input class='peerdynamic' type="checkbox" {{"checked='yes'" if local_settings_copy["Peers"][p_uuid]["dynamic"] else ""}}></span></div>
 
                 <div class="alert alert-warning alert-dismissable alert-tweak hide peerportbad"><button type="button" class="close">&times;</button><strong>Warning!</strong> The port you have specified is invalid.<span class="glyphicon glyphicon-hand-down"></span></div>
                 <div class="input-group"><span class="input-group-addon"><span class='iga-fixed-width'>Port</span></span><input autocomplete="off" type="text" class="form-control peerport" placeholder="External Port" value="{{local_settings_copy["Peers"][p_uuid]["port"]}}"></div>
@@ -348,7 +348,7 @@
     %end
     </div>
     <div class="panel-footer text-right">
-      <span id="peers-saving" class="label label-info hide">Saving Settings... <img src="/static/images/ajax_loader.gif"></span>
+      <span id="peers-saving" class="label label-info hide">Saving Settings... <img src="/static/images/ajax_loader.gif" alt="loading..."></span>
       <span id="peers-saved" class="label label-success hide">Settings Saved</span>
       <span id="peers-unsaved" class="label label-danger hide">Unsaved Settings</span>
       <span id="peers-errors" class="label label-danger hide">You have errors your must correct</span>
