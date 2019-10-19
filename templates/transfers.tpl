@@ -1,4 +1,5 @@
-%rebase templates/layout title='Transfers'
+%rebase('templates/layout', title='Transfers')
+
 <div class="modal fade" id="removeModal" tabindex="-1" role="dialog">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">

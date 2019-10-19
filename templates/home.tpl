@@ -1,4 +1,4 @@
-%rebase templates/layout title='Home'
+%rebase('templates/layout', title='Home')
 <div class="row">
   <div class="col-md-12">
     <div class="panel panel-info">

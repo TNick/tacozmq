@@ -1,7 +1,7 @@
 %import os
 %import taco.constants
 
-%rebase templates/layout title='Settings'
+%rebase('templates/layout', title='Settings')
 
 <div class="modal fade bs-modal-lg" id="addPeerModal" tabindex="-1" role="dialog">
   <div class="modal-dialog modal-lg">

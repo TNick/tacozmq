@@ -22,7 +22,7 @@
     <script src="/static/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="/static/js/main.js"></script>
     <script type="text/javascript" src="/static/js/{{title.lower()}}.js"></script>
-  
+
   </head>
 
   <body>
@@ -44,12 +44,12 @@
             <!-- <li class="{{"active" if title=="Search" else ""}}"><a href="/search.taco"><i class="glyphicon glyphicon-search"></i><span class="navlink">Search</span></a></li> -->
             <li class="{{"active" if title=="Browse" else ""}}"><a href="/browse.taco"><i class="glyphicon glyphicon-folder-open"></i><span style="margin-left: 5px" class="navlink">Browse</span></a></li>
             <li class="{{"active" if title=="Settings" else ""}}"><a href="/settings.taco"><i class="glyphicon glyphicon-edit"></i><span class="navlink">Settings</span></a></li>
-            <li class="{{"active" if title=="Help" else ""}}"><a target="_blank" href="https://github.com/withorwithoutgod/tacozmq/wiki"><i class="glyphicon glyphicon-info-sign"></i><span class="navlink">Help</span></a></li> 
+            <li class="{{"active" if title=="Help" else ""}}"><a target="_blank" href="https://github.com/withorwithoutgod/tacozmq/wiki"><i class="glyphicon glyphicon-info-sign"></i><span class="navlink">Help</span></a></li>
             <li class="navlink-nohide"><a href="."><i class="glyphicon glyphicon-arrow-down"></i> <span id="downloadspeed"></span></a></li>
             <li class="navlink-nohide"><a href="."><i class="glyphicon glyphicon-arrow-up"></i> <span id="uploadspeed"></span></a></li>
 
           </ul>
-      
+
       <ul class="nav navbar-nav navbar-right">
       <li class="dropdown">
         <a class="dropdown-toggle" data-toggle="dropdown" href="#"><i class="glyphicon glyphicon-off"></i><span class="navlink">Shutdown</span> <b class="caret"></b></a>

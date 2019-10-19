@@ -1,4 +1,5 @@
-%rebase templates/layout title='Search'
+%rebase('templates/layout', title='Search')
+
 <div class="row">
   <div class="col-md-12">
     <div class="panel panel-info">
@@ -18,7 +19,7 @@
 </div>
 <div class="row">
   <div class="col-md-1"></div>
-  <div class="col-md-10">     
+  <div class="col-md-10">
     <div class="input-group">
     <input type="text" class="form-control">
     <span class="input-group-btn">
