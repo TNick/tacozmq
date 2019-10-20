@@ -56,6 +56,8 @@ class TacoCommands(
                 TacoCommands.process_reply_certs,
             NET_REPLY_GET_FILE_CHUNK:
                 TacoCommands.process_reply_get_file_chunk,
+            NET_REPLY_SHARE_LISTING:
+                TacoCommands.process_share_listing_cmd,
         }
 
     def create_request(self, command=NET_GARBAGE, data=None):

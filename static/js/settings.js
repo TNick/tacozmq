@@ -115,6 +115,9 @@ function confirm_add_share() {
       $valid_name = false;
     }
   });
+  if ($sharelocation === '/') {
+    $valid_name = false;
+  }
   if (pattern.test($sharename) && $valid_name) {
     $("div[id='share-add-helper'] span:first").html($sharename);
     $("div[id='share-add-helper'] input:first").val($sharelocation);

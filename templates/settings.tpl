@@ -108,10 +108,10 @@
       <div class="modal-body">
         <div class="alert alert-warning alert-dismissable hide" id="alphanumonly">
           <button type="button" class="close">&times;</button>
-          <strong>Warning!</strong> Sharename must be between 3 and 64
+          <strong>Warning!</strong> Share-name must be between 3 and 64
           characters long, and must only contain alphanumeric characters,
           spaces, and periods. In addition, duplicate share names
-          are not allowed.
+          are not allowed and root path cannot be shared.
         </div>
 
         <div class="input-group">

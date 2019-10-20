@@ -506,11 +506,13 @@ class TacoFilesystemManager(threading.Thread):
                     for [peer_uuid, share_dir, shareuuid] in self.results_to_return:
                         if share_dir in self.listings.keys():
                             self.set_status("RESULTS ready to send:" + str((share_dir, shareuuid)))
-                            request = self.app.commands.request_share_listing_result_cmd(share_dir, shareuuid,
-                                                                                         self.listings[share_dir])
-                            self.app.add_to_output_queue(peer_uuid, request, PRIORITY_MEDIUM)
+                            request = self.app.commands.request_share_listing_result_cmd(
+                                share_dir, shareuuid, self.listings[share_dir])
+                            self.app.add_to_output_queue(
+                                peer_uuid, request, PRIORITY_MEDIUM)
                             self.app.clients.sleep.set()
-                            self.results_to_return.remove([peer_uuid, share_dir, shareuuid])
+                            self.results_to_return.remove(
+                                [peer_uuid, share_dir, shareuuid])
                             self.sleep.set()
 
             if abs(time.time() - self.last_purge) > FILESYSTEM_CACHE_PURGE:
@@ -579,9 +581,19 @@ class TacoFilesystemManager(threading.Thread):
     def perform_share_listing_requests(self, peer_uuid):
         share_dir, shareuuid = \
             self.app.share_listing_requests[peer_uuid].get()
-        self.set_status(
-            "Filesystem thread has a pending share listing request: %r, %r" %
-            (share_dir, shareuuid))
+        # self.set_status(
+        #     "Filesystem thread has a pending share listing request: %r, %r" %
+        #     (share_dir, shareuuid))
+        # share_dir = share_dir.split('/')
+        # if len(share_dir) == 0:
+        #     # Asking for the list of shares
+        #     with self.app.settings_lock:
+        #         for (share_name, share_path) in self.app.settings["Shares"]:
+        #
+        # else:
+        #     # asking about a directory
+
+
         root_share_dir = os.path.normpath(share_dir)
         root_share_name = root_share_dir.split("/")[1]
         root_path = os.path.normpath("/" + "/".join(root_share_dir.split("/")[2:]) + "/")
@@ -594,6 +606,9 @@ class TacoFilesystemManager(threading.Thread):
 
 
 class TacoFilesystemWorker(threading.Thread):
+    """ What we seem to have here is a very fancy, very threaded way of
+    listing directories. No less than 4 threads are working assiduously at this
+    holly task. """
     def __init__(self, app, worker_id):
         threading.Thread.__init__(self, name="thTacoFS-%r" % worker_id)
         self.app = app
@@ -626,6 +641,7 @@ class TacoFilesystemWorker(threading.Thread):
     def run(self):
         self.set_status("Starting Filesystem Worker #" + str(self.worker_id))
         while not self.stop.is_set():
+
             try:
                 root_share_dir = self.app.filesys.listing_work_queue.get(True, 0.2)
                 self.set_status(str(self.worker_id) + " -- " + str(root_share_dir))
