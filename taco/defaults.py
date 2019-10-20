@@ -40,7 +40,7 @@ default_settings_kv = {
     "TacoNET Certificates Store": "certstore/",
 
     # The list of shared resources.
-    "Shares": {},
+    "Shares": [],
 
     # The list of peers we know about.
     "Peers": {}
