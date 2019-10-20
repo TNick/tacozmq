@@ -42,10 +42,10 @@ class TacoSettings(object):
             if self.app.settings is None:
                 self.app.settings = {"Peers": {}, "Shares": []}
 
-    def load(self, need_lock=True, save_after=False, read_file=True):
+    def load(self, need_lock=True, save_after=True, read_file=True):
         """ Reads the settings file and validates its content. """
         logger.debug("loading settings ...")
-
+        local_save_after = False
         if need_lock:
             self.app.settings_lock.acquire()
 
@@ -65,7 +65,7 @@ class TacoSettings(object):
                 if key_name not in self.app.settings:
                     self.app.settings[key_name] = \
                         taco.defaults.default_settings_kv[key_name]
-                    save_after = True
+                    local_save_after = True
 
             if not os.path.isdir(self.app.settings["TacoNET Certificates Store"]):
                 logger.debug("Making %s Certificates Store", APP_NAME)
@@ -74,7 +74,7 @@ class TacoSettings(object):
             logger.debug("Verifying settings share list is in correct format")
             if not isinstance(self.app.settings["Shares"], list):
                 self.app.shares = []
-                save_after = True
+                local_save_after = True
 
             logger.debug("Verifying settings peer dict is in correct format")
             self.refresh_keys()
@@ -84,7 +84,7 @@ class TacoSettings(object):
                 self.app.settings_lock.release()
 
         logger.debug("settings loaded")
-        if save_after:
+        if local_save_after and save_after:
             self.save(load_after=False)
 
     def refresh_keys(self):
