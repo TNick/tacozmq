@@ -14,7 +14,7 @@ from .chat import Chat
 from .get_file_chunk import GetFileChunk
 from .give_file_chunk import GiveFileChunk
 from .rollcall import RollCall
-from .share import SharelListing
+from .share import ShareListing
 from .share_result import SharelResult
 
 logger = logging.getLogger('tacozmq.cmd')
@@ -22,7 +22,7 @@ logger = logging.getLogger('tacozmq.cmd')
 
 class TacoCommands(
         Certs, Chat, GetFileChunk, GiveFileChunk, RollCall,
-        SharelListing, SharelResult):
+        ShareListing, SharelResult):
     """
     The class host - for each exchange - the means to create the request
     on the client side, to create the reply on

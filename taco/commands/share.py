@@ -19,7 +19,7 @@ else:
     from queue import Queue
 
 
-class SharelListing(object):
+class ShareListing(object):
     """
 
     """

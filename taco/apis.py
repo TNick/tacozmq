@@ -238,8 +238,7 @@ def upload_q_get(jdata, app):
 @post_route("browseresult")
 def browse_result(jdata, app):
     """
-    Request to retrieve a result previously asked wit browse()
-
+    Request to retrieve a result previously asked with browse()
     """
     while True:
         try:
