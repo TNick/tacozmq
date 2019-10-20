@@ -15,16 +15,16 @@ function API_Alert()
   {
     $("#apialert").removeClass("hide");
   },2000);
-  //setTimeout(Check_For_API_Errors,10000);
+  //setTimeout(check_for_API_errors,10000);
 }
 
-function Check_For_API_Errors()
+function check_for_API_errors()
 {
   var $api_action = {"action":"apistatus","data":""};
   $.ajax({url:"/api.post",type:"POST",data:JSON.stringify($api_action),contentType:"application/json; charset=utf-8",dataType:"json",error: API_Alert,success: function(data)
   {
     $("#apialert").addClass("hide");
-    setTimeout(Check_For_API_Errors,1000);
+    setTimeout(check_for_API_errors,1000);
   }
   });
   var $api_action = {"action":"speed","data":""};
@@ -42,7 +42,7 @@ function commify(num)
 {
   num = num.toString();
   checker = /([0-9]+)([0-9]{3})/;
-  while (checker.test(num)) 
+  while (checker.test(num))
   {
     num = num.replace(checker, '$1'+','+'$2');
   }

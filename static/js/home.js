@@ -1,19 +1,26 @@
-function Update_Peer_Status()
+/**
+ * Updates the status about the peers and schedules next invocation.
+ */
+function update_peer_status()
 {
-    var $api_action = {"action":"peerstatus","data":""};
-    
-    $.ajax({url:"/api.post",type:"POST",data:JSON.stringify($api_action),contentType:"application/json; charset=utf-8",dataType:"json",error: API_Alert,success: function(data)
-      {
-        //console.log(data);
+    var $api_action = {"action":"peerstatus", "data":""};
+
+    $.ajax({
+      url:"/api.post",
+      type:"POST",
+      data:JSON.stringify($api_action),
+      contentType:"application/json; charset=utf-8",
+      dataType:"json",
+      error: API_Alert,
+      success: function(data) {
         $("#peerstatustable .loadingthing").addClass("hide");
         $uuids_that_exists = [];
 
         //slideout disabled peers
-        $(".peerstatusrow").each(function() 
+        $(".peerstatusrow").each(function()
         {
-          if ($(this).attr("id") in data) 
+          if (!($(this).attr("id") in data))
           {
-          } else { 
             $(this).slideUp(function() { $(this).remove(); });
           }
         });
@@ -26,53 +33,89 @@ function Update_Peer_Status()
           outdiff = data[$uuid][3];
           nick = data[$uuid][4];
           localnick = data[$uuid][5];
-          if (indiff  < 10000000) { $inmsg = indiff.toFixed(2) + " second(s) ago" } else { $inmsg = "Never" }
-          if (outdiff < 10000000) { $outmsg = outdiff.toFixed(2) + " second(s) ago" } else { $outmsg = "Never" }
-          if (localnick != "") { $localnickmsg = "<br>(" + localnick + ")" } else { $localnickmsg = "" }
-          if ($("#" + $uuid).length == 1) 
-          { 
-            $tr = $("#" + $uuid); 
-            if ($tr.find(".tablenick").html() != nick) { $tr.find(".tablenick").html(nick); }
-            if ($tr.find(".localnick").html() != $localnickmsg) { $tr.find(".localnick").html($localnickmsg); }
-            if ($tr.find(".lastincoming").html() != $inmsg) { $tr.find(".lastincoming").html($inmsg); }
-            if ($tr.find(".lastoutgoing").html() != $outmsg) { $tr.find(".lastoutgoing").html($outmsg); }
+          console.log(data[$uuid]);
+
+          $inmsg = compute_message(indiff)
+          $outmsg = compute_message(outdiff)
+
+          if (localnick != "") {
+            $localnickmsg = "<br>(" + localnick + ")"
+          } else {
+            $localnickmsg = ""
+          }
+
+          if ($("#" + $uuid).length == 1) {
+            $tr = $("#" + $uuid);
+            if ($tr.find(".tablenick").html() != nick) {
+              $tr.find(".tablenick").html(nick);
+            }
+            if ($tr.find(".localnick").html() != $localnickmsg) {
+              $tr.find(".localnick").html($localnickmsg);
+            }
+            if ($tr.find(".lastincoming").html() != $inmsg) {
+              $tr.find(".lastincoming").html($inmsg);
+            }
+            if ($tr.find(".lastoutgoing").html() != $outmsg) {
+              $tr.find(".lastoutgoing").html($outmsg);
+            }
           } else {
             $tr = $("#peerstatusrowhelper");
-            $tr.clone().removeClass("hide").addClass("peerstatusrow").removeAttr("id").attr("id",$uuid).appendTo("#peerstatustbody");
+            $tr.clone()
+              .removeClass("hide")
+              .addClass("peerstatusrow")
+              .removeAttr("id")
+              .attr("id", $uuid)
+              .appendTo("#peerstatustbody");
             $tr = $("#" + $uuid);
-            if ($tr.find(".tablenick").html() != nick) { $tr.find(".tablenick").html(nick); }
-            if ($tr.find(".localnick").html() != $localnickmsg) { $tr.find(".localnick").html($localnickmsg); }
-            if ($tr.find(".lastincoming").html() != $inmsg) { $tr.find(".lastincoming").html($inmsg); }
-            if ($tr.find(".lastoutgoing").html() != $outmsg) { $tr.find(".lastoutgoing").html($outmsg); }
-
-          }
-          if (indiff >= 6.0) 
-          { 
-            $tr.find(".incomingstatus").find(".glyphicon").removeClass("glyphicon-question-sign glyphicon-ok-sign").addClass("glyphicon-minus-sign"); 
-            $tr.find(".incomingstatus").removeClass("yellow-td green-td").addClass("red-td");
-          }
-          else if (indiff < 6.0 && indiff >= 0.0) 
-          {
-            $tr.find(".incomingstatus").find(".glyphicon").removeClass("glyphicon-question-sign glyphicon-minus-sign").addClass("glyphicon-ok-sign");
-            $tr.find(".incomingstatus").removeClass("yellow-td red-td").addClass("green-td");
+            if ($tr.find(".tablenick").html() != nick) {
+              $tr.find(".tablenick").html(nick);
+            }
+            if ($tr.find(".localnick").html() != $localnickmsg) {
+              $tr.find(".localnick").html($localnickmsg);
+            }
+            if ($tr.find(".lastincoming").html() != $inmsg) {
+              $tr.find(".lastincoming").html($inmsg);
+            }
+            if ($tr.find(".lastoutgoing").html() != $outmsg) {
+              $tr.find(".lastoutgoing").html($outmsg);
+            }
           }
 
-          if (outdiff >= 6.0)
-          {
-            $tr.find(".outgoingstatus").find(".glyphicon").removeClass("glyphicon-question-sign glyphicon-ok-sign").addClass("glyphicon-minus-sign");
-            $tr.find(".outgoingstatus").removeClass("yellow-td green-td").addClass("red-td");
-          }
-          else if (outdiff < 6.0 && outdiff >= 0.0)
-          {
-            $tr.find(".outgoingstatus").find(".glyphicon").removeClass("glyphicon-question-sign glyphicon-minus-sign").addClass("glyphicon-ok-sign");
-            $tr.find(".outgoingstatus").removeClass("yellow-td red-td").addClass("green-td");
-          }
+          set_status_marker(indiff, ".incomingstatus", $tr)
+          set_status_marker(outdiff, ".outgoingstatus", $tr)
         }
-        setTimeout(Update_Peer_Status,500 + (Math.random()*500)+1);
+        setTimeout(update_peer_status, 500 + (Math.random()*500)+1);
       }
     });
-
 }
+
+function compute_message(the_diff) {
+  if (the_diff < 10000000) {
+    return the_diff.toFixed(2) + " second(s) ago";
+  } else {
+    return "Never";
+  }
+}
+
+function set_status_marker(the_diff, elem, tr) {
+  if (the_diff >= 6.0)
+  {
+    tr.find(elem).find(".glyphicon")
+      .removeClass("glyphicon-question-sign glyphicon-ok-sign")
+      .addClass("glyphicon-minus-sign");
+    tr.find(elem)
+      .removeClass("yellow-td green-td")
+      .addClass("red-td");
+  } else if (the_diff < 6.0 && the_diff >= 0.0) {
+    tr.find(elem).find(".glyphicon")
+      .removeClass("glyphicon-question-sign glyphicon-minus-sign")
+      .addClass("glyphicon-ok-sign");
+    tr.find(elem)
+      .removeClass("yellow-td red-td")
+      .addClass("green-td");
+  }
+}
+
 function Update_Thread_Status()
 {
     var $api_action = {"action":"threadstatus","data":""};
@@ -93,7 +136,7 @@ function Update_Thread_Status()
             if ("lastupdate" in data["threads"]["server"]) { $("#serverlast").html(data["threads"]["server"]["lastupdate"].toFixed(2) + " second(s) ago"); }
           }
 
-     
+
         }
         setTimeout(Update_Thread_Status,1500 + (Math.random()*500)+1);
       }
@@ -101,8 +144,8 @@ function Update_Thread_Status()
 }
 
 $( document ).ready(function() {
-  Update_Peer_Status();
+  update_peer_status();
   Update_Thread_Status();
-  Check_For_API_Errors();
+  check_for_API_errors();
 });
 

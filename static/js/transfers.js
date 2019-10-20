@@ -43,9 +43,9 @@ function Update_Completed_Q()
   var $api_action = {"action":"completedqget","data":""};
   $.ajax({url:"/api.post",type:"POST",data:JSON.stringify($api_action),contentType:"application/json; charset=utf-8",dataType:"json",error: API_Alert,success: function(data)
   {
-    if (data["result"].length == 0) { $("#completedqempty").removeClass("hide"); $("#completedfooter").addClass("hide");} 
-    else 
-    { 
+    if (data["result"].length == 0) { $("#completedqempty").removeClass("hide"); $("#completedfooter").addClass("hide");}
+    else
+    {
       $("#completedqempty").addClass("hide");
       $("#completedfooter").removeClass("hide");
       $("#completedfooterremovebutton").unbind("click").click(function()
@@ -63,7 +63,7 @@ function Update_Completed_Q()
       table=[];
       table.push("<table class='table table-hover table-condensed table-bordered'>");
       table.push("<tbody>");
-      
+
       for (var i = 0; i < data["result"].length; i++)
       {
         table.push("<tr><td>" + data["result"][i][0] + "</td><td>" + data["peerinfo"][data["result"][i][1]][0] + "</td><td>" + data["result"][i][2] + "</td><td class='text-left'>" + data["result"][i][3] + "</td><td>" + commify(data["result"][i][4]) + " bytes</td></tr>");
@@ -79,7 +79,6 @@ function Update_Completed_Q()
 function Update_Download_Q()
 {
   if ($dontrefresh) { setTimeout(Update_Download_Q,1000); return; }
-  console.log("1");
   var $api_action = {"action":"downloadqget","data":""};
   $.ajax({url:"/api.post",type:"POST",data:JSON.stringify($api_action),contentType:"application/json; charset=utf-8",dataType:"json",error: API_Alert,success: function(data)
   {
@@ -99,7 +98,7 @@ function Update_Download_Q()
         }
         table.push("<table class='table table-hover table-condensed table-bordered'>");
         table.push("<tbody>");
-        for (var i = 0; i < data["result"][peer_uuid].length; i++) 
+        for (var i = 0; i < data["result"][peer_uuid].length; i++)
         {
           $rows_added++;
           percent = (data["fileinfo"][peer_uuid][data["result"][peer_uuid][i][1]] * 100.00 ) / data["result"][peer_uuid][i][2];
@@ -137,9 +136,9 @@ function Update_Download_Q()
           $.ajax({url:"/api.post",type:"POST",data:JSON.stringify($api_action),contentType:"application/json; charset=utf-8",dataType:"json",error: API_Alert,success: function(data)
           {
             console.log("DOWNLOAD Q REMOVE STATUS:" + data);
-            if (data == 1) { 
-              buttonthis.closest("tr").fadeOut(function() { 
-                $(this).remove(); 
+            if (data == 1) {
+              buttonthis.closest("tr").fadeOut(function() {
+                $(this).remove();
                 //location.reload();
               });
             }
@@ -156,7 +155,7 @@ function Update_Download_Q()
 }
 
 $( document ).ready(function() {
-  Check_For_API_Errors();
+  check_for_API_errors();
   Update_Download_Q();
   Update_Completed_Q();
 

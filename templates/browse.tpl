@@ -23,7 +23,7 @@
                     <h3>The request for this directory listing timed out.</h3>
                     <h5>You should probably return to the peer listing and try again.</h5>
                 </div>
-                <img id="loaderthings" src="/static/images/ajax-loader.gif" alt="loading...">
+                <img id="loaderthing" src="/static/images/ajax-loader.gif" alt="loading...">
                 <div id="peerlisting" class="text-left"></div>
                 <div id="sharelisting" class="text-left"></div>
                 <div id="dirlisting" class="text-left"></div>

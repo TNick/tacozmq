@@ -386,7 +386,7 @@ function Set_Up_Peer_Buttons()
 $( document ).ready(function() {
  Set_Up_Delete_Share();
  Set_Up_Peer_Buttons();
- Check_For_API_Errors();
+ check_for_API_errors();
  $("button[id='add-share']").click(function() { Add_Share(); });
 
  $("button[id='browsedownload']").click(function() { Download_Browse(); });
