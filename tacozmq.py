@@ -192,6 +192,13 @@ def main():
         no_encryption=args.disable_encryption,
         zmq_monitor=args.log_level<3
     )
+
+    try:
+        from taco import overrides
+        overrides.init(app, args)
+    except ImportError:
+        overrides = None
+
     return app.start(
         host=args.web_addr,
         port=args.web_port,

@@ -10,3 +10,5 @@ setup.bat
 venv/*
 virtualenv/*
 *.egg-info
+overrides.py
+overrides.pyd
