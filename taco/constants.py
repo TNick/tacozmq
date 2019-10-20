@@ -129,6 +129,9 @@ NO_IDENTITY = "0"
 
 # The value returned in result by json when an error condition was encountered.
 API_ERROR = "ERROR"
+# The value returned in result by json when the request succeded and there's
+# nothing else to return.
+API_OK = "OK"
 
 # Highest priority message.
 # TODO: this is not really used in code or any faster.
