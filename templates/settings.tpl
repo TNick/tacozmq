@@ -108,16 +108,30 @@
       <div class="modal-body">
         <div class="alert alert-warning alert-dismissable hide" id="alphanumonly">
           <button type="button" class="close">&times;</button>
-          <strong>Warning!</strong> Sharename must be between 3 and 64 characters long, and must only contain alphanumeric characters, spaces, and periods. In addition, duplicate share names are not allowed.
+          <strong>Warning!</strong> Sharename must be between 3 and 64
+          characters long, and must only contain alphanumeric characters,
+          spaces, and periods. In addition, duplicate share names
+          are not allowed.
         </div>
 
-        <div class="input-group"><span class="input-group-addon">Share Name: </span><input maxlength="32" id="addsharename" type="text" class="form-control" placeholder="Name your share here"></div>
-        <div class="input-group"><span class="input-group-addon">Share Location: </span><input readonly id="addshareloc" type="text" class="form-control"></div>
+        <div class="input-group">
+            <span class="input-group-addon">Share Name: </span>
+            <input maxlength="32" id="addsharename" type="text"
+            class="form-control" placeholder="Name your share here">
+        </div>
+        <div class="input-group">
+            <span class="input-group-addon">Share Location: </span>
+            <input readonly id="addshareloc" type="text" class="form-control">
+        </div>
         <div id="sharebrowselistdiv" class="list-group"></div>
       </div>
       <div class="modal-footer">
-        <button type="button" id="addsharecancelbutton" class="btn btn-default">Cancel</button>
-        <button type="button" id="addshareconfirmbutton" class="btn btn-primary"><span class="glyphicon glyphicon-plus"></span> Add Share</button>
+        <button type="button" id="addsharecancelbutton" class="btn btn-default">
+            Cancel
+        </button>
+        <button type="button" id="addshareconfirmbutton" class="btn btn-primary">
+            <span class="glyphicon glyphicon-plus"></span> Add Share
+        </button>
       </div>
     </div>
   </div>
@@ -132,8 +146,14 @@
       <div class="modal-body">
       </div>
       <div class="modal-footer">
-        <button type="button" id="deletesharecancelbutton" class="btn btn-default" data-dismiss="modal">Cancel</button>
-        <button type="button" id="deleteshareconfirmbutton" class="btn btn-danger"><span class="glyphicon glyphicon-remove"></span> Delete Share</button>
+        <button type="button" id="deletesharecancelbutton"
+                class="btn btn-default" data-dismiss="modal">
+            Cancel
+        </button>
+        <button type="button" id="deleteshareconfirmbutton"
+                class="btn btn-danger">
+            <span class="glyphicon glyphicon-remove"></span> Delete Share
+        </button>
       </div>
     </div>
   </div>
