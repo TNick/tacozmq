@@ -20,23 +20,117 @@ if sys.version_info < (3, 0):
     from Queue import Queue
 else:
     from queue import Queue
-    unicode = str
 
+    unicode = str
 
 if os.name == 'nt':
     import ctypes
 
-    def Get_Free_Space(path):
+
+    def get_free_space(path):
         free_bytes = ctypes.c_ulonglong(0)
         total = ctypes.c_ulonglong(0)
         ctypes.windll.kernel32.GetDiskFreeSpaceExW(
             ctypes.c_wchar_p(path), None, ctypes.pointer(total),
-                                                   ctypes.pointer(free_bytes))
+            ctypes.pointer(free_bytes))
         return free_bytes.value, total.value
+
+
+    def get_drives():
+        drives = []
+        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+        for letter in range(ord('A'), ord('Z') + 1):
+            if bitmask & 1:
+                drives.append('%s:' % chr(letter))
+            bitmask >>= 1
+
+        return drives
+
+
+    def get_windows_root_directories():
+        """ Retrieves a set of directories to be listed at top level. """
+        result = []
+
+        try:
+            home_dir = os.environ['HOME']
+        except KeyError:
+            try:
+                home_dir = os.environ['HOMEDRIVE'] + os.environ['HOMEPATH']
+            except KeyError:
+                home_dir = ""
+        if os.path.isdir(home_dir):
+            result.append({
+                'name': "Home",
+                'path': home_dir,
+                'kind': 'dir'
+            })
+
+            desktop_dir = os.path.join(home_dir, 'Desktop')
+            if os.path.isdir(home_dir):
+                result.append({
+                    'name': "Desktop",
+                    'path': desktop_dir,
+                    'kind': 'dir'
+                })
+
+        try:
+            public_dir = os.environ['PUBLIC']
+        except KeyError:
+            public_dir = ""
+        if os.path.isdir(public_dir):
+            result.append({
+                'name': "Public",
+                'path': public_dir,
+                'kind': 'dir'
+            })
+
+        for drive in get_drives():
+            name_buffer = ctypes.create_unicode_buffer(1024)
+            system_buffer = ctypes.create_unicode_buffer(1024)
+            serial_number = None
+            max_component_length = None
+            file_system_flags = None
+
+            rc = ctypes.windll.kernel32.GetVolumeInformationW(
+                ctypes.c_wchar_p(drive + "\\"),
+                name_buffer,
+                ctypes.sizeof(name_buffer),
+                serial_number,
+                max_component_length,
+                file_system_flags,
+                system_buffer,
+                ctypes.sizeof(system_buffer)
+            )
+            label = str(name_buffer.value)
+            file_system = str(system_buffer.value)
+
+            result.append({
+                'name': ('%s (%s)  %s' % (label, drive, file_system))
+                if len(label) > 0 else
+                '%s  %s' % (drive, file_system),
+                'path': drive,
+                'kind': 'dir'
+            })
+
+        try:
+            temp_dir = os.environ['TEMP']
+        except KeyError:
+            try:
+                temp_dir = os.environ['TMP']
+            except KeyError:
+                temp_dir = ""
+        if os.path.isdir(temp_dir):
+            result.append({
+                'name': "Temp",
+                'path': temp_dir,
+                'kind': 'dir'
+            })
+
+        return result
 
 elif os.name == 'posix':
 
-    def Get_Free_Space(path):
+    def get_free_space(path):
         try:
             data = os.statvfs(path)
             free = data.f_bavail * data.f_frsize
@@ -46,7 +140,7 @@ elif os.name == 'posix':
             return 0, 0
 
 
-def Is_Path_Under_A_Share(app, path):
+def is_path_under_share(app, path):
     return_value = False
     if os.path.isdir(os.path.normpath(path)):
         with app.settings_lock:
@@ -60,7 +154,7 @@ def Is_Path_Under_A_Share(app, path):
     return return_value
 
 
-def Convert_Share_To_Path(app, share):
+def convert_path_to_share(app, share):
     return_val = ""
     with app.settings_lock:
         for [share_name, share_path] in app.settings["Shares"]:
@@ -150,7 +244,7 @@ class TacoFilesystemManager(threading.Thread):
             request = self.app.commands.request_get_file_chunk_cmd(
                 share_dir, file_name, file_offset, chunk_uuid)
             self.app.add_to_output_queue(peer_uuid, request, PRIORITY_FILE)
-            self.client_downloading_requested_chunks[peer_uuid]\
+            self.client_downloading_requested_chunks[peer_uuid] \
                 .append(chunk_uuid)
             (time_request_sent, time_request_ack, offset) = \
                 self.client_downloading_status[peer_uuid][chunk_uuid]
@@ -170,8 +264,7 @@ class TacoFilesystemManager(threading.Thread):
 
         if \
                 abs(time.time() - incoming) > ROLLCALL_TIMEOUT or \
-                abs(time.time() - outgoing) > ROLLCALL_TIMEOUT:
-
+                        abs(time.time() - outgoing) > ROLLCALL_TIMEOUT:
             self.set_status(
                 "I have items in the download queue, "
                 "but client has timed out rollcalls: %r", peer_uuid)
@@ -255,7 +348,7 @@ class TacoFilesystemManager(threading.Thread):
                     os.rename(file_name_incomplete, file_name_complete)
                 else:
                     (root, ext) = os.path.splitext(file_name_complete)
-                    file_name_complete = root + u"." + unicode(uuid.uuid4().hex) + u"." + ext
+                    file_name_complete = root + "." + unicode(uuid.uuid4().hex) + "." + ext
                     os.rename(file_name_incomplete, file_name_complete)
 
                 with self.app.completed_q_lock:
@@ -324,7 +417,8 @@ class TacoFilesystemManager(threading.Thread):
 
             for peer_uuid in self.client_downloading_chunks_last_received:
                 if peer_uuid in self.client_downloading and self.client_downloading[peer_uuid] != 0:
-                    if abs(time.time() - self.client_downloading_chunks_last_received[peer_uuid]) > DOWNLOAD_Q_WAIT_FOR_DATA:
+                    if abs(time.time() - self.client_downloading_chunks_last_received[
+                        peer_uuid]) > DOWNLOAD_Q_WAIT_FOR_DATA:
                         self.set_status("Download Borked for: " + peer_uuid)
                         self.client_downloading[peer_uuid] = 0
 
@@ -379,12 +473,12 @@ class TacoFilesystemManager(threading.Thread):
                 self.set_status(
                     "Need to send a chunk of data: " + str((peer_uuid, share_dir, file_name, offset, chunk_uuid)))
 
-                root_share_name = share_dir.split(u"/")[1]
-                root_path = os.path.normpath(u"/" + u"/".join(share_dir.split(u"/")[2:]) + u"/")
-                directory = os.path.normpath(Convert_Share_To_Path(self.app, root_share_name) + u"/" + root_path)
-                fullpath = os.path.normpath(directory + u"/" + file_name)
+                root_share_name = share_dir.split("/")[1]
+                root_path = os.path.normpath("/" + "/".join(share_dir.split("/")[2:]) + "/")
+                directory = os.path.normpath(convert_path_to_share(self.app, root_share_name) + "/" + root_path)
+                fullpath = os.path.normpath(directory + "/" + file_name)
 
-                if not Is_Path_Under_A_Share(self.app, os.path.dirname(fullpath)):
+                if not is_path_under_share(self.app, os.path.dirname(fullpath)):
                     break
 
                 if not os.path.isdir(directory):
@@ -413,7 +507,7 @@ class TacoFilesystemManager(threading.Thread):
                         if share_dir in self.listings.keys():
                             self.set_status("RESULTS ready to send:" + str((share_dir, shareuuid)))
                             request = self.app.commands.request_share_listing_result_cmd(share_dir, shareuuid,
-                                                                                  self.listings[share_dir])
+                                                                                         self.listings[share_dir])
                             self.app.add_to_output_queue(peer_uuid, request, PRIORITY_MEDIUM)
                             self.app.clients.sleep.set()
                             self.results_to_return.remove([peer_uuid, share_dir, shareuuid])
@@ -460,20 +554,9 @@ class TacoFilesystemManager(threading.Thread):
                             del self.app.share_listings_mine[share_listing_uuid]
 
             with self.app.share_listing_requests_lock:
-                for peer_uuid in self.app.share_listing_requests.keys():
+                for peer_uuid in self.app.share_listing_requests:
                     while not self.app.share_listing_requests[peer_uuid].empty():
-                        (share_dir, shareuuid) = self.app.share_listing_requests[peer_uuid].get()
-                        self.set_status(
-                            "Filesystem thread has a pending share listing request: " + str((share_dir, shareuuid)))
-                        root_share_dir = os.path.normpath(share_dir)
-                        root_share_name = root_share_dir.split(u"/")[1]
-                        root_path = os.path.normpath(u"/" + u"/".join(root_share_dir.split(u"/")[2:]) + u"/")
-                        directory = os.path.normpath(Convert_Share_To_Path(self.app, root_share_name) + u"/" + root_path)
-                        if (Is_Path_Under_A_Share(self.app, directory) and os.path.isdir(directory)) or root_share_dir == u"/":
-                            self.listing_work_queue.put(share_dir)
-                            self.results_to_return.append([peer_uuid, share_dir, shareuuid])
-                        else:
-                            self.set_status("User has requested a bogus share: " + str(share_dir))
+                        self.perform_share_listing_requests(peer_uuid)
 
             while not self.listing_results_queue.empty():
                 (success, the_time, share_dir, dirs, files) = self.listing_results_queue.get()
@@ -487,9 +570,27 @@ class TacoFilesystemManager(threading.Thread):
         for i in self.workers:
             i.join()
         self.set_status("Closing Open Files")
-        for file_name in self.files_r: self.files_r[file_name].close()
-        for file_name in self.files_w: self.files_w[file_name].close()
+        for file_name in self.files_r:
+            self.files_r[file_name].close()
+        for file_name in self.files_w:
+            self.files_w[file_name].close()
         self.set_status("Filesystem Manager Exit")
+
+    def perform_share_listing_requests(self, peer_uuid):
+        share_dir, shareuuid = \
+            self.app.share_listing_requests[peer_uuid].get()
+        self.set_status(
+            "Filesystem thread has a pending share listing request: %r, %r" %
+            (share_dir, shareuuid))
+        root_share_dir = os.path.normpath(share_dir)
+        root_share_name = root_share_dir.split("/")[1]
+        root_path = os.path.normpath("/" + "/".join(root_share_dir.split("/")[2:]) + "/")
+        directory = os.path.normpath(convert_path_to_share(self.app, root_share_name) + "/" + root_path)
+        if (is_path_under_share(self.app, directory) and os.path.isdir(directory)) or root_share_dir == "/":
+            self.listing_work_queue.put(share_dir)
+            self.results_to_return.append([peer_uuid, share_dir, shareuuid])
+        else:
+            self.set_status("User has requested a bogus share: " + str(share_dir))
 
 
 class TacoFilesystemWorker(threading.Thread):
@@ -529,10 +630,10 @@ class TacoFilesystemWorker(threading.Thread):
                 root_share_dir = self.app.filesys.listing_work_queue.get(True, 0.2)
                 self.set_status(str(self.worker_id) + " -- " + str(root_share_dir))
                 root_share_dir = os.path.normpath(root_share_dir)
-                root_share_name = root_share_dir.split(u"/")[1]
-                root_path = os.path.normpath(u"/" + u"/".join(root_share_dir.split(u"/")[2:]) + u"/")
-                directory = os.path.normpath(Convert_Share_To_Path(self.app, root_share_name) + u"/" + root_path)
-                if root_share_dir == u"/":
+                root_share_name = root_share_dir.split("/")[1]
+                root_path = os.path.normpath("/" + "/".join(root_share_dir.split("/")[2:]) + "/")
+                directory = os.path.normpath(convert_path_to_share(self.app, root_share_name) + "/" + root_path)
+                if root_share_dir == "/":
                     self.set_status("Root share listing request")
                     share_listing = []
                     with self.app.settings_lock:
@@ -542,7 +643,7 @@ class TacoFilesystemWorker(threading.Thread):
                     results = [1, time.time(), root_share_dir, share_listing, []]
                     self.app.filesys.listing_results_queue.put(results)
                     continue
-                assert Is_Path_Under_A_Share(self.app, directory)
+                assert is_path_under_share(self.app, directory)
                 assert os.path.isdir(directory)
             except Exception:
                 continue
@@ -558,7 +659,7 @@ class TacoFilesystemWorker(threading.Thread):
             else:
                 try:
                     for fileobject in dir_list:
-                        joined = os.path.normpath(directory + u"/" + fileobject)
+                        joined = os.path.normpath(directory + "/" + fileobject)
                         if os.path.isfile(joined):
                             file_mod = os.stat(joined).st_mtime
                             file_size = os.path.getsize(joined)
