@@ -183,8 +183,6 @@ function get_dir_listing(sharedir, peer_uuid, data) {
  * @param {*} sharedir 
  */
 function get_share_listing_results(peer_uuid, sharedir) {
-  console.log(`get_share_listing_results(sharedir=${sharedir}, peer_uuid=${peer_uuid})`)
-
   $("#sharelisting").html("");
   $("#loaderthing").removeClass("hide");
   if ($failcount > 200) {
@@ -207,7 +205,6 @@ function get_share_listing_results(peer_uuid, sharedir) {
       dataType: "json",
       error: API_Alert,
       success: function (data) {
-        console.log(`browseresult = `, data)
 
         if ("result" in data) {
 

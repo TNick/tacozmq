@@ -14,10 +14,6 @@ import os
 from ..constants import *
 
 logger = logging.getLogger('tacozmq.cmd')
-if sys.version_info < (3, 0):
-    from Queue import Queue
-else:
-    from queue import Queue
 
 
 class ShareListing(object):
@@ -73,8 +69,9 @@ class ShareListing(object):
                             'kind': 'dir'
                        })
             else:
-                # TODO: there's no reason shares to be a list;
+                # TODO: there's no reason for shares to be a list;
                 # they could be a dict
+
                 # asking about a directory
                 b_found, share_path, share_name = False, '', ''
                 for (share_name, share_path) in self.app.settings["Shares"]:
@@ -126,41 +123,6 @@ class ShareListing(object):
                 "share_dir": share_dir,
                 "message": message
             })
-
-        #
-        #
-        #
-        # reply = self.create_reply(NET_REPLY_SHARE_LISTING, 1)
-        # try:
-        #     share_dir = data_block["sharedir"]
-        #     share_uuid = data_block["results_uuid"]
-        # except KeyError:
-        #     logger.error("Improper request (sharedir, results_uuid) "
-        #                  "in %r", data_block)
-        #     return reply
-        #
-        # logger.log(TRACE,
-        #            "Got a share listing request from %r for %r uuid %r",
-        #            peer_uuid, share_dir, share_uuid)
-        # # with self.app.share_listing_requests_lock:
-        # #     try:
-        # #         peer_queue = self.app.share_listing_requests[peer_uuid]
-        # #     except KeyError:
-        # #         peer_queue = Queue()
-        # #         self.app.share_listing_requests[peer_uuid] = peer_queue
-        # #     peer_queue.put((share_dir, share_uuid))
-        # #     self.app.filesys.sleep.set()
-        #
-        # share_dir = share_dir.split('/')
-        # if len(share_dir) == 0:
-        #     # Asking for the list of shares
-        #     with self.app.settings_lock:
-        #         for (share_name, share_path) in self.app.settings["Shares"]:
-        #
-        # else:
-        #     # asking about a directory
-        #
-        # return reply
 
     def process_share_listing_cmd(self, peer_uuid, data_block):
         try:
