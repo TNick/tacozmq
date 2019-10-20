@@ -6,7 +6,7 @@ var z85_pattern = /^[\.:\+=\^!/\*\?&<>\(\)\[\]\{\}@%\$#a-zA-Z0-9-]{40}$/;
 var uuid_pattern = /^([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[a-fA-F0-9]{32})$/i;
 
 function download_browse() {
-  share_browse("/", $("#downloadlistdiv"), $("#downloadloc"))
+  share_browse("", $("#downloadlistdiv"), $("#downloadloc"))
   $("#downloadloc").val("/");
   $("button[id='downloadconfirmbutton']").unbind("click").click(function () {
     $("#setting-downloadlocation").val($("#downloadloc").val());
@@ -23,7 +23,7 @@ function download_browse() {
 }
 
 function cert_browse() {
-  share_browse("/", $("#certloclistdiv"), $("#certloc"))
+  share_browse("", $("#certloclistdiv"), $("#certloc"))
   $("#certloc").val("/");
   $("button[id='certconfirmbutton']").unbind("click").click(function () {
     $("#setting-certlocation").val($("#certloc").val());
@@ -38,36 +38,74 @@ function cert_browse() {
   $('#certModal').modal();
 }
 
-
-function share_browse($browsedir, $target, $target2) {
+/**
+ * Requests the content of a directory and populates a list.
+ * 
+ * The format of the reply in case of success is:
+ * {
+ *   result: OK,
+ *   data: [
+ *     {
+ *       name: 'my name 1',
+ *       path: '/a/b/c/d',
+ *       kind: 'file'
+ *     },
+ *     {
+ *       name: 'my name 2',
+ *       path: '/a/b/c/e',
+ *       kind: 'dir'
+ *     }
+ *   ]
+ * }
+ * 
+ * The format of the reply in case of error is:
+ * {
+ *   result: ERROR,
+ *   message: 'some error message'
+ * }
+ * 
+ * @param {*} $browsedir The directory to list; leave empty to browse the root.
+ * @param {*} $list_div The list to populate
+ * @param {*} $path_elem Where to show current path.
+ */
+function share_browse($browsedir, $list_div, $path_elem) {
   $.getJSON("/browselocaldirs/" + $browsedir, function (data) {
-    var items = [];
-    if ($browsedir != "" && $browsedir != "/") {
-      var updir = $browsedir.split("/");
-      updir.pop()
-      updir = updir.join("/");
-      items.push('<a href="#" data-browsedir="' + btoa(updir) + '" class="list-group-item"><span class="glyphicon glyphicon-arrow-left"></span> &nbsp.. [BACK]</a>');
-    }
-    $.each(data, function (key, val) {
-      if ($browsedir == "/") {
-        $browsedir = "";
+    if (data["result"] !== "ERROR") {
+      data = data["data"];
+      let items = [];
+      if ($browsedir != "" && $browsedir != "/") {
+        let updir = $browsedir.split("/");
+        updir.pop()
+        updir = updir.join("/");
+        items.push('<a href="#" data-browsedir="' + btoa(updir) + '" class="list-group-item"><span class="glyphicon glyphicon-arrow-left"></span> &nbsp;.. [BACK]</a>');
       }
-      items.push('<a href="#" data-browsedir="' + btoa($browsedir + '/' + val) + '" class="list-group-item"><span class="glyphicon glyphicon-folder-open"></span> &nbsp' + val + '</a>');
-    });
-    $target.html(items.join(""));
-    if ($browsedir == "") {
-      $browsedir = "/";
+      $.each(data, function (key, val) {
+        if (val['kind'] === 'dir') {
+          items.push(`<a href="#" data-browsedir="${btoa(val['path'])}" 
+                                  class="list-group-item">
+                        <span class="glyphicon glyphicon-folder-open"></span>
+                        &nbsp;${val['name']}
+                      </a>`);
+        }
+      });
+      $list_div.html(items.join(""));
+      if ($browsedir == "") {
+        $browsedir = "/";
+      }
+      $path_elem.val($browsedir);
+      $list_div.find("a[class='list-group-item']").unbind("click").click(function () {
+        $browsedir = atob($(this).data("browsedir"));
+        share_browse($browsedir, $list_div, $path_elem);
+      });
+      $list_div.scrollTop(0);
+    } else {
+      // TODO: visual alert that something went wrong.
+      console.log(data["message"])
     }
-    $target2.val($browsedir);
-    $target.find("a[class='list-group-item']").unbind("click").click(function () {
-      $browsedir = atob($(this).data("browsedir"));
-      share_browse($browsedir, $target, $target2);
-    });
-    $target.scrollTop(0);
   });
 }
 
-function Confirm_Add_Share() {
+function confirm_add_share() {
   var pattern = new RegExp("^[a-zA-Z0-9\. ]{3,64}$");
   var $sharename = $("input[id='addsharename']").val();
   var $sharelocation = $("input[id='addshareloc']").val();
@@ -84,7 +122,7 @@ function Confirm_Add_Share() {
     $("div[id='TEMPSHARE'] button[data-action='delete']").data("name", $sharename);
     $("div[id='TEMPSHARE'] button[data-action='edit']").data("name", $sharename);
     $("div[id='TEMPSHARE']").removeAttr("id");
-    Set_Up_Delete_Share();
+    set_up_delete_share();
     $('#addShareModal').modal('hide');
     $("div[id='addasharebelow']").addClass("hide");
     $("span[id='shares-unsaved']").removeClass("hide");
@@ -94,14 +132,16 @@ function Confirm_Add_Share() {
   //setTimeout(function() { $("#addShareModal .modal-body div[id='alphanumonly']").fadeOut(); },5000);
 }
 
-function Add_Share() {
-  //$("div[id='share-add-helper']").clone().removeAttr("id").removeClass("hide").appendTo("div[id='share-listing']");
+/**
+ * Shows the Add Share dialog and starts the request to populate it.
+ */
+function add_share() {
   share_browse("/", $("#sharebrowselistdiv"), $("#addshareloc"))
   $("#addShareModal .modal-body div[id='alphanumonly']").addClass('hide');
   $("#addshareloc").val("/");
   $("#addsharename").val("");
   $("button[id='addshareconfirmbutton']").unbind("click").click(function () {
-    Confirm_Add_Share();
+    confirm_add_share();
   });
   $("button[id='addsharecancelbutton']").unbind("click").click(function () {
     $("#sharebrowselistdiv").scrollTop(0);
@@ -110,17 +150,17 @@ function Add_Share() {
   $('#addShareModal').modal();
 }
 
-function Delete_Share($id) {
+function delete_share($id) {
   var $sharename = $id.data("name");
   var $fadeoutdiv = $id.parent().parent();
   $('#deleteShareModal .modal-body').html("<h5>Delete sharename: <b>" + $sharename + "</b>?</h5>");
   $('#deleteShareModal').modal();
   $("button[id='deleteshareconfirmbutton']").unbind("click").click(function () {
-    Confirm_Delete_Share($sharename, $fadeoutdiv);
+    Confirm_delete_share($sharename, $fadeoutdiv);
   });
 }
 
-function Confirm_Delete_Share($name, $div) {
+function Confirm_delete_share($name, $div) {
   $('#deleteShareModal').modal('hide');
   $div.fadeOut(1000, function () {
     $(this).remove();
@@ -173,14 +213,16 @@ function Save_Shares() {
   });
 }
 
-function Set_Up_Delete_Share() {
-  $("button[data-type='share'][data-action='delete']").unbind("click").click(function () {
-    Delete_Share($(this));
-  });
-  $("button[data-type='share'][data-action='delete']").prop("disabled", false);
+function set_up_delete_share() {
+  $("button[data-type='share'][data-action='delete']")
+    .unbind("click")
+    .click(function () {
+      delete_share($(this));
+    })
+    .prop("disabled", false);
 }
 
-function Save_Peers() {
+function save_peers() {
   var $api_action = {
     "action": "peersave",
     "data": []
@@ -399,7 +441,7 @@ function Confirm_Add_Peer() {
     $("#TEMPPEER").removeAttr("id");
     $('#addPeerModal').modal('hide');
     $("span[id='peers-unsaved']").removeClass("hide");
-    Set_Up_Peer_Buttons();
+    set_up_peer_buttons();
 
   } catch (err) {
     $("#addPeerModal #bad-connect-string").removeClass("hide").find(".exact-error").html(err);
@@ -453,16 +495,20 @@ function Confirm_Delete_Peer($peer, $div) {
 
 }
 
-function Set_Up_Peer_Buttons() {
+function set_up_peer_buttons() {
   $("button[class~='peer-enabled-button']").unbind("click").click(function () {
     $(this).data("status", !$(this).data("status"));
-    $(this).closest(".peerblock").toggleClass("green-bg").toggleClass("red-bg");
+    $(this).closest(".peerblock")
+      .toggleClass("green-bg")
+      .toggleClass("red-bg");
     if ($(this).find("span[class='peer-text']").html() == "Enable Peer") {
       $(this).find("span[class='peer-text']").html("Disable Peer");
     } else {
       $(this).find("span[class='peer-text']").html("Enable Peer")
     }
-    $(this).find("span[class~='glyphicon']").toggleClass("glyphicon-stop").toggleClass("glyphicon-play");
+    $(this).find("span[class~='glyphicon']")
+      .toggleClass("glyphicon-stop")
+      .toggleClass("glyphicon-play");
     $("#peers-unsaved").removeClass("hide");
   });
 
@@ -496,11 +542,11 @@ function Set_Up_Peer_Buttons() {
 }
 
 $(document).ready(function () {
-  Set_Up_Delete_Share();
-  Set_Up_Peer_Buttons();
+  set_up_delete_share();
+  set_up_peer_buttons();
   check_for_API_errors();
   $("button[id='add-share']").click(function () {
-    Add_Share();
+    add_share();
   });
 
   $("button[id='browsedownload']").click(function () {
@@ -521,7 +567,7 @@ $(document).ready(function () {
     save();
   });
   $("button[id='save-peers']").prop("disabled", false).click(function () {
-    Save_Peers();
+    save_peers();
   });
 
   $('#addShareModal').on('shown.bs.modal', function () {
