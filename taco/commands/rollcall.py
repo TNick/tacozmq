@@ -15,7 +15,7 @@ logger = logging.getLogger('tacozmq.cmd')
 
 class RollCall(object):
     """
-    Hart-beat mixin for peers i the network.
+    Hart-beat mixin for peers in the network.
 
     The request is initiated by the client with NET_REQUEST_ROLLCALL
     and no payload. The server replies with NET_REPLY_ROLLCALL
