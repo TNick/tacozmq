@@ -14,8 +14,9 @@ import json
 import sys
 
 from bottle import Bottle, static_file, template, request
-from taco.constants import GB
+from taco.constants import GB, API_ERROR, API_OK
 from taco.apis import post_routes
+from taco.filesystem import get_windows_root_directories
 from taco.utils import norm_join, ShutDownException
 
 logger = logging.getLogger('tacozmq.app')
@@ -100,52 +101,106 @@ def create_bottle(app):
 
     @result.route('/browselocaldirs/')
     @result.route('/browselocaldirs/<browse_path:path>')
-    def index(browse_path="/"):
-        browse_path = str(browse_path)
-        if platform.system() != 'Windows':
-            base_dir = '/'
-            if browse_path == "":
-                browse_path = base_dir
-            elif base_dir != base_dir:
-                browse_path = base_dir + browse_path
-        else:
-            try:
-                base_dir = os.environ['HOME']
-                if not os.path.isdir(base_dir):
-                    logger.debug("%s does not exist", base_dir)
-                    base_dir = os.environ['HOMEDRIVE'] + os.environ['HOMEPATH']
-                    if not os.path.isdir(base_dir):
-                        logger.debug("%s does not exist", base_dir)
-                        base_dir = os.environ['PUBLIC']
-                        if not os.path.isdir(base_dir):
-                            logger.debug("%s does not exist", base_dir)
-                            from pathlib import Path
-                            base_dir = str(Path.home())
-                            if not os.path.isdir(base_dir):
-                                raise RuntimeError("Cannot find a path to present")
+    def index(browse_path='/'):
+        """
+        Presents the content of a directory.
 
-                if browse_path == "":
-                    browse_path = base_dir
+
+        :param browse_path: The path to list.
+        :return: A json representation of the reply.
+        """
+        if len(browse_path) == 0:
+            browse_path = '/'
+
+        while True:
+            if request.remote_addr != "127.0.0.1":
+                message = "Due to security concerns listing of local " \
+                           "directories is prohibited"
+                break
+
+            try:
+                listing = []
+                if (platform.system() == 'Windows') and (browse_path == '/'):
+                    listing = get_windows_root_directories()
                 else:
-                    browse_path = os.path.join(base_dir, browse_path)
-            except Exception:
-                browse_path = ""
-        try:
-            logger.debug("Listing directories in %s", browse_path)
-            contents = os.listdir(browse_path)
-        except (FileNotFoundError, PermissionError):
-            contents = []
+                    if not os.path.isdir(browse_path):
+                        message = "No such path: %s" % browse_path
+                        break
 
-        final_contents = []
-        for item in contents:
-            try:
-                if os.path.isdir(os.path.join(browse_path, item)):
-                    final_contents.resultend(item)
-            except Exception:
-                continue
-        final_contents.sort()
+                    for item in os.listdir(browse_path):
+                        path = os.path.join(browse_path, item)
+                        listing.append({
+                            'name': item,
+                            'path': path,
+                            'kind': 'dir' if os.path.isdir(path)
+                                    else 'file' if os.path.isfile(path)
+                                    else 'unknown'
+                        })
 
-        return json.dumps(final_contents)
+                return json.dumps({
+                    "result": API_OK,
+                    "data": listing
+                })
+            except (SystemExit, KeyboardInterrupt):
+                raise
+            except Exception as exc:
+                message = "exception while browsing local paths"
+                logger.exception(message)
+
+            break
+
+        logger.error("failed to browse", message)
+        return json.dumps({
+            "result": API_ERROR,
+            "message": message
+        })
+
+        #
+        # browse_path = str(browse_path)
+        # if platform.system() != 'Windows':
+        #     base_dir = '/'
+        #     if browse_path == "":
+        #         browse_path = base_dir
+        #     elif base_dir != base_dir:
+        #         browse_path = base_dir + browse_path
+        # else:
+        #     try:
+        #         base_dir = os.environ['HOME']
+        #         if not os.path.isdir(base_dir):
+        #             logger.debug("%s does not exist", base_dir)
+        #             base_dir = os.environ['HOMEDRIVE'] + os.environ['HOMEPATH']
+        #             if not os.path.isdir(base_dir):
+        #                 logger.debug("%s does not exist", base_dir)
+        #                 base_dir = os.environ['PUBLIC']
+        #                 if not os.path.isdir(base_dir):
+        #                     logger.debug("%s does not exist", base_dir)
+        #                     from pathlib import Path
+        #                     base_dir = str(Path.home())
+        #                     if not os.path.isdir(base_dir):
+        #                         raise RuntimeError("Cannot find a path to present")
+        #
+        #         if browse_path == "":
+        #             browse_path = base_dir
+        #         else:
+        #             browse_path = os.path.join(base_dir, browse_path)
+        #     except Exception:
+        #         browse_path = ""
+        # try:
+        #     logger.debug("Listing directories in %s", browse_path)
+        #     contents = os.listdir(browse_path)
+        # except (FileNotFoundError, PermissionError):
+        #     contents = []
+        #
+        # final_contents = []
+        # for item in contents:
+        #     try:
+        #         if os.path.isdir(os.path.join(browse_path, item)):
+        #             final_contents.resultend(item)
+        #     except Exception:
+        #         continue
+        # final_contents.sort()
+        #
+        # return json.dumps(final_contents)
 
     @result.route('/get/<what>')
     def get__data(what):
@@ -170,8 +225,8 @@ def create_bottle(app):
             with app.settings_lock:
                 down_dir = app.settings["Download Location"]
             if os.path.isdir(down_dir):
-                from taco.filesystem import Get_Free_Space
-                (free, total) = Get_Free_Space(down_dir)
+                from taco.filesystem import get_free_space
+                (free, total) = get_free_space(down_dir)
                 if free == 0 and total == 0:
                     output = 0.0
                 else:
