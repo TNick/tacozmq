@@ -63,7 +63,18 @@ class Peer(object):
         """ Creates the socket, sets it up, creates queues for it and
         saves a reference in our list of clients. """
         app = self.parent.app
+
+        # The DEALER socket type talks to a set of anonymous peers,
+        # sending and receiving messages using round-robin algorithms.
+        # It is reliable, insofar as it does not drop messages.
+        # DEALER works as an asynchronous replacement for REQ, for
+        # clients that talk to REP or ROUTER servers.
+        # https://rfc.zeromq.org/spec:28/REQREP/#the-dealer-socket-type
         new_socket = client_ctx.socket(zmq.DEALER)
+
+        # Do not keep messages in memory that were not send yet when
+        # we attempt to close the socket.
+        # http://api.zeromq.org/2-1:zmq-setsockopt#toc15
         new_socket.setsockopt(zmq.LINGER, 0)
         if not app.no_encryption:
             client_public, client_secret = zmq.auth.load_certificate(
@@ -261,15 +272,16 @@ class Peer(object):
             with app.download_limiter_lock:
                 app.download_limiter.add(len(data))
             self.set_last_reply()
-            self.parent.next_request = app.commands.process_reply(self.uuid, data)
-            if self.parent.next_request != "":
+            self.parent.next_request = app.commands.process_reply(
+                self.uuid, data)
+            if self.parent.next_request is not None:
                 logger.log(TRACE, "will reply to peer %s with %d bytes",
                            self.uuid, len(self.parent.next_request))
                 with app.medium_priority_output_queue_lock:
                     app.medium_priority_output_queue[self.uuid] \
                         .put(self.parent.next_request)
             else:
-                logger.log(TRACE, "no reply to peer %s", self.uuid,)
+                logger.log(TRACE, "no further request to peer %s", self.uuid,)
 
             self.parent.sleep.set()
             try:
@@ -404,101 +416,6 @@ class TacoClients(threading.Thread):
         self.private_dir = None
         logger.debug('clients manager constructed')
 
-    def settings_changed(self):
-        """ Called when we detect a change in settings. """
-        self.settings_trace_number = self.app.store.trace_number
-
-        if not self.app.no_encryption:
-            with self.app.settings_lock:
-                self.public_dir = self.app.public_dir
-            self.set_status("Configuring Curve to use public key dir: %s" %
-                            self.public_dir)
-            # Certificates can be added and removed in directory at any time.
-            # configure_curve must be called every time certificates are added
-            # or removed, in order to update the Authenticator’s state.
-            self.client_auth.configure_curve(
-                domain='*', location=self.public_dir)
-
-    def get_client_last_reply(self, peer_uuid):
-        """ Gets the last time a client was responsive or -1 if never seen. """
-        with self.client_last_reply_time_lock:
-            try:
-                return self.peers[peer_uuid].last_reply_time
-            except KeyError:
-                return -1
-
-    def set_status(self, text, level=logging.DEBUG):
-        logger.log(level, text)
-        with self.status_lock:
-            self.status = text
-            self.status_time = time.time()
-
-    def get_status(self):
-        with self.status_lock:
-            return self.status, self.status_time
-
-    def run_peer(self, peer_uuid, client_ctx, poller):
-        """ Executed as part of the state update for each enabled peer. """
-        peer_data = self.app.settings["Peers"][peer_uuid]
-        if peer_uuid in self.peers:
-            peer = self.peers[peer_uuid]
-        else:
-            peer = Peer(self, peer_uuid)
-            self.peers[peer_uuid] = peer
-
-        # If we haven't seen this peer before we initialize the wait time
-        # until next reconnect attempt to be the minimum one.
-        # if peer_uuid not in self.client_reconnect_mod:
-        #     self.client_reconnect_mod[peer_uuid] = CLIENT_RECONNECT_MIN
-
-        # If we haven't computed a time when this client should connect we
-        # do that now based on current time and stored delta.
-        # if peer_uuid not in self.client_connect_time:
-        #     self.client_connect_time[peer_uuid] = \
-        #         time.time() + self.client_reconnect_mod[peer_uuid]
-
-        # Is it time to contact this peer?
-        if time.time() < peer.connect_time:
-            return
-
-        # Is it already started?
-        if peer.socket is not None:
-            return
-
-        self.set_status("Starting Client for: %s" % peer_uuid)
-        try:
-            ip_of_client = gethostbyname(peer_data["hostname"])
-        except gaierror:
-            self.set_status("Starting of client failed due to bad "
-                            "dns lookup: %s" % peer_uuid)
-            return
-
-        new_socket = peer.create_peer_socket(
-            client_ctx, peer_data, ip_of_client)
-        poller.register(new_socket, zmq.POLLIN)
-
-    def state_update(self, client_ctx, poller):
-        """ Called regularly to update the status of the peers. """
-        logger.log(TRACE, 'state being updated...')
-
-        if self.settings_trace_number != self.app.store.trace_number:
-            self.settings_changed()
-
-        with self.app.settings_lock:
-            self.max_upload_rate = \
-                self.app.settings["Upload Limit"] * KB
-            self.max_download_rate = \
-                self.app.settings["Download Limit"] * KB
-
-        self.chunk_request_rate = \
-            float(FILESYSTEM_CHUNK_SIZE) / float(self.max_download_rate)
-
-        with self.app.settings_lock:
-            for peer_uuid in self.app.settings["Peers"].keys():
-                if self.app.settings["Peers"][peer_uuid]["enabled"]:
-                    self.run_peer(peer_uuid, client_ctx, poller)
-        logger.log(TRACE, 'state updated')
-
     def create(self):
         """ Called from run() to initialize the state at thread startup. """
         self.set_status("Client Startup")
@@ -573,3 +490,116 @@ class TacoClients(threading.Thread):
             logger.log(TRACE, 'client loop done')
 
         self.terminate()
+
+    def settings_changed(self):
+        """ Called when we detect a change in settings. """
+        self.settings_trace_number = self.app.store.trace_number
+
+        if not self.app.no_encryption:
+            with self.app.settings_lock:
+                self.public_dir = self.app.public_dir
+            self.set_status("Configuring Curve to use public key dir: %s" %
+                            self.public_dir)
+            # Certificates can be added and removed in directory at any time.
+            # configure_curve must be called every time certificates are added
+            # or removed, in order to update the Authenticator’s state.
+            self.client_auth.configure_curve(
+                domain='*', location=self.public_dir)
+
+    def get_client_last_reply(self, peer_uuid):
+        """ Gets the last time a client was responsive or -1 if never seen. """
+        with self.client_last_reply_time_lock:
+            try:
+                return self.peers[peer_uuid].last_reply_time
+            except KeyError:
+                return -1
+
+    def is_client_responsive(self, peer_uuid):
+        """ Tell if we've seen data from a peer in a resonable time. """
+
+        last_reply = self.get_client_last_reply(peer_uuid)
+        # Is this peer responsive?
+        # If the timeout has not yet expired it is responsive.
+        return abs(last_reply - time.time()) < ROLLCALL_TIMEOUT
+
+    def responsive_peer_ids(self):
+        """ Get a list of responsive peers. """
+        return [
+            peer_uuid for peer_uuid in self.app.settings["Peers"]
+            if self.is_client_responsive(peer_uuid)]
+
+    def set_status(self, text, level=logging.DEBUG):
+        logger.log(level, text)
+        with self.status_lock:
+            self.status = text
+            self.status_time = time.time()
+
+    def get_status(self):
+        with self.status_lock:
+            return self.status, self.status_time
+
+    def run_peer(self, peer_uuid, client_ctx, poller):
+        """ Executed as part of the state update for each enabled peer. """
+        peer_data = self.app.settings["Peers"][peer_uuid]
+        if peer_uuid in self.peers:
+            peer = self.peers[peer_uuid]
+        else:
+            peer = Peer(self, peer_uuid)
+            self.peers[peer_uuid] = peer
+
+        # If we haven't seen this peer before we initialize the wait time
+        # until next reconnect attempt to be the minimum one.
+        # if peer_uuid not in self.client_reconnect_mod:
+        #     self.client_reconnect_mod[peer_uuid] = CLIENT_RECONNECT_MIN
+
+        # If we haven't computed a time when this client should connect we
+        # do that now based on current time and stored delta.
+        # if peer_uuid not in self.client_connect_time:
+        #     self.client_connect_time[peer_uuid] = \
+        #         time.time() + self.client_reconnect_mod[peer_uuid]
+
+        # Is it time to contact this peer?
+        if time.time() < peer.connect_time:
+            return
+
+        # Is it already started?
+        if peer.socket is not None:
+            return
+
+        self.set_status("Starting Client for: %s" % peer_uuid)
+        try:
+            ip_of_client = gethostbyname(peer_data["hostname"])
+        except gaierror:
+            self.set_status("Starting of client failed due to bad "
+                            "dns lookup: %s" % peer_uuid)
+            return
+
+        new_socket = peer.create_peer_socket(
+            client_ctx, peer_data, ip_of_client)
+        poller.register(new_socket, zmq.POLLIN)
+
+    def state_update(self, client_ctx, poller):
+        """ Called regularly to update the status of the peers. """
+        logger.log(TRACE, 'state being updated...')
+
+        # Check if settings changed and update accordingly.
+        # We use this mechanism because, if keys are added / removed,
+        # the ThreadAuthenticator would not notice
+        # (configure_curve needs to be called again).
+        if self.settings_trace_number != self.app.store.trace_number:
+            self.settings_changed()
+
+        with self.app.settings_lock:
+            self.max_upload_rate = \
+                self.app.settings["Upload Limit"] * KB
+            self.max_download_rate = \
+                self.app.settings["Download Limit"] * KB
+
+        self.chunk_request_rate = \
+            float(FILESYSTEM_CHUNK_SIZE) / float(self.max_download_rate)
+
+        with self.app.settings_lock:
+            for peer_uuid in self.app.settings["Peers"].keys():
+                if self.app.settings["Peers"][peer_uuid]["enabled"]:
+                    self.run_peer(peer_uuid, client_ctx, poller)
+        logger.log(TRACE, 'state updated')
