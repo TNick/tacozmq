@@ -452,12 +452,12 @@ class TacoFilesystemManager(threading.Thread):
                             self.set_status("Purging Filesystem cache for share: " + share_dir)
                             del self.listings[share_dir]
 
-                with self.app.share_listings_i_care_about_lock:
-                    for share_listing_uuid in self.app.share_listings_i_care_about.keys():
-                        the_time = self.app.share_listings_i_care_about[share_listing_uuid]
+                with self.app.share_listings_mine_lock:
+                    for share_listing_uuid in self.app.share_listings_mine.keys():
+                        the_time = self.app.share_listings_mine[share_listing_uuid]
                         if abs(time.time() - the_time) > FILESYSTEM_LISTING_TIMEOUT:
                             self.set_status("Purging Filesystem listing i care about for: " + share_listing_uuid)
-                            del self.app.share_listings_i_care_about[share_listing_uuid]
+                            del self.app.share_listings_mine[share_listing_uuid]
 
             with self.app.share_listing_requests_lock:
                 for peer_uuid in self.app.share_listing_requests.keys():

@@ -41,8 +41,8 @@ class SharelResult(object):
             share_dir = data_block["sharedir"]
             share_uuid = data_block["results_uuid"]
             results = data_block["results"]
-            with self.app.share_listings_i_care_about_lock:
-                assert share_uuid in self.app.share_listings_i_care_about
+            with self.app.share_listings_mine_lock:
+                assert share_uuid in self.app.share_listings_mine
         except (KeyError, AssertionError):
             logger.error("Improper request (sharedir, results_uuid, "
                          "results) in %r", data_block)
@@ -56,7 +56,7 @@ class SharelResult(object):
         with self.app.share_listings_lock:
             self.app.share_listings[(peer_uuid, share_dir)] = [
                 time.time(), results]
-        with self.app.share_listings_i_care_about_lock:
-            del self.app.share_listings_i_care_about[share_uuid]
+        with self.app.share_listings_mine_lock:
+            del self.app.share_listings_mine[share_uuid]
 
         return reply

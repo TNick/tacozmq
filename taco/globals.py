@@ -42,8 +42,8 @@ class TacoApp(object):
     public_keys_lock = threading.Lock()
     public_keys = {}
 
-    share_listings_i_care_about = {}
-    share_listings_i_care_about_lock = threading.Lock()
+    share_listings_mine = {}
+    share_listings_mine_lock = threading.Lock()
 
     share_listing_requests_lock = threading.Lock()
     share_listing_requests = {}

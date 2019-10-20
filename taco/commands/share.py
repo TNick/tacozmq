@@ -26,8 +26,8 @@ class ShareListing(object):
     def request_share_listing_cmd(
             self, peer_uuid, sharedir, share_listing_uuid):
 
-        with self.app.share_listings_i_care_about_lock:
-            self.app.share_listings_i_care_about[share_listing_uuid] = time.time()
+        with self.app.share_listings_mine_lock:
+            self.app.share_listings_mine[share_listing_uuid] = time.time()
         request = self.create_request(
             NET_REQUEST_SHARE_LISTING,
             {"sharedir": sharedir, "results_uuid": share_listing_uuid})
