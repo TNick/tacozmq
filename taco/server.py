@@ -77,41 +77,6 @@ class TacoServer(threading.Thread):
         self.socket = None
         logger.debug('server constructed')
 
-    def settings_changed(self):
-        """ Called when we detect a change in settings. """
-        self.settings_trace_number = self.app.store.trace_number
-
-        if not self.app.no_encryption:
-            with self.app.settings_lock:
-                public_dir = self.app.public_dir
-            self.set_status("Configuring Curve to use private key dir: %s" %
-                            public_dir)
-            # Certificates can be added and removed in directory at any time.
-            # configure_curve must be called every time certificates are added
-            # or removed, in order to update the Authenticator’s state.
-            self.server_auth.configure_curve(domain='*', location=public_dir)
-
-    def set_client_last_request(self, peer_uuid):
-        logger.log(TRACE, 'server has serviced a request from: %s', peer_uuid)
-        with self.client_last_request_time_lock:
-            self.client_last_request_time[peer_uuid] = time.time()
-
-    def get_client_last_request(self, peer_uuid):
-        with self.client_last_request_time_lock:
-            if peer_uuid in self.client_last_request_time:
-                return self.client_last_request_time[peer_uuid]
-        return -1
-
-    def set_status(self, text, level=logging.INFO):
-        logger.log(level, text)
-        with self.status_lock:
-            self.status = text
-            self.status_time = time.time()
-
-    def get_status(self):
-        with self.status_lock:
-            return self.status, self.status_time
-
     def create(self):
         """ Called from run() to initialize the state at thread startup. """
         self.set_status("Server Startup")
@@ -128,7 +93,16 @@ class TacoServer(threading.Thread):
             private_dir = self.app.private_dir
 
         self.set_status("Creating Server Context...", logging.DEBUG)
+
+        # The REP socket type acts as as service for a set of client peers,
+        # receiving requests and sending replies back to the requesting
+        # peers. It is designed for simple remote-procedure call models.
+        # https://rfc.zeromq.org/spec:28/REQREP/#the-rep-socket-type
         socket = self.server_ctx.socket(zmq.REP)
+
+        # Do not keep messages in memory that were not send yet when
+        # we attempt to close the socket.
+        # http://api.zeromq.org/2-1:zmq-setsockopt#toc15
         socket.setsockopt(zmq.LINGER, 0)
 
         if not self.app.no_encryption:
@@ -207,6 +181,10 @@ class TacoServer(threading.Thread):
                 socks = {}
             logger.log(TRACE, 'cycle start with %d active sockets', len(socks))
 
+            # Check if settings changed and update accordingly.
+            # We use this mechanism because, if keys are added / removed,
+            # the ThreadAuthenticator would not notice
+            # (configure_curve needs to be called again).
             if self.settings_trace_number != self.app.store.trace_number:
                 self.settings_changed()
 
@@ -233,8 +211,44 @@ class TacoServer(threading.Thread):
                     self.app.upload_limiter.add(len(reply))
                 self.socket.send(reply)
             elif len(reply) > 0:
-                logger.debug(
+                logger.error(
                     'got reply <%r> to send but socket is in invalid state',
                     reply)
 
         self.terminate()
+
+    def settings_changed(self):
+        """ Called when we detect a change in settings. """
+        self.settings_trace_number = self.app.store.trace_number
+
+        if not self.app.no_encryption:
+            with self.app.settings_lock:
+                public_dir = self.app.public_dir
+            self.set_status("Configuring Curve to use private key dir: %s" %
+                            public_dir)
+            # Certificates can be added and removed in directory at any time.
+            # configure_curve must be called every time certificates are added
+            # or removed, in order to update the Authenticator’s state.
+            self.server_auth.configure_curve(domain='*', location=public_dir)
+
+    def set_client_last_request(self, peer_uuid):
+        logger.log(TRACE, 'server has serviced a request from: %s', peer_uuid)
+        with self.client_last_request_time_lock:
+            self.client_last_request_time[peer_uuid] = time.time()
+
+    def get_client_last_request(self, peer_uuid):
+        with self.client_last_request_time_lock:
+            if peer_uuid in self.client_last_request_time:
+                return self.client_last_request_time[peer_uuid]
+        return -1
+
+    def set_status(self, text, level=logging.INFO):
+        logger.log(level, text)
+        with self.status_lock:
+            self.status = text
+            self.status_time = time.time()
+
+    def get_status(self):
+        with self.status_lock:
+            return self.status, self.status_time
+
