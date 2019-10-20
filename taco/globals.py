@@ -73,12 +73,17 @@ class TacoApp(object):
     low_priority_output_queue = {}
     file_request_output_queue = {}
 
-    def __init__(self, host=None, port=None, no_encryption=False,
-                 zmq_monitor=False):
+    def __init__(self,
+                 host=None, port=None,
+                 web_host=None, web_port=None,
+                 no_encryption=False, zmq_monitor=False):
         super(TacoApp, self).__init__()
         TacoApp.instance = self
+
         self.no_encryption = no_encryption
         self.zmq_monitor = zmq_monitor
+        self.web_host = web_host
+        self.web_port = web_port
 
         from taco.settings import TacoSettings
         self.store = TacoSettings(self)

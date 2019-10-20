@@ -188,7 +188,8 @@ def main():
     # Start the application.
     from taco.globals import TacoApp
     app = TacoApp(
-        args.app_addr, args.app_port,
+        host=args.app_addr, port=args.app_port,
+        web_host=args.web_addr, web_port=args.web_port,
         no_encryption=args.disable_encryption,
         zmq_monitor=args.log_level<3
     )
