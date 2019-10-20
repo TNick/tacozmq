@@ -33,7 +33,7 @@ class Chat(object):
                 logger.log(TRACE, "chat trimmed to %d elements",
                            len(self.app.chat_log))
 
-        self.app.Add_To_All_Output_Queues(packb(output_block))
+        self.app.add_to_all_output_queues(packb(output_block))
         logger.log(TRACE, "chat sent to all peers (%d bytes): %r",
                    len(output_block), chat_msg)
 

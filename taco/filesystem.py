@@ -149,7 +149,7 @@ class TacoFilesystemManager(threading.Thread):
 
             request = self.app.commands.request_get_file_chunk_cmd(
                 share_dir, file_name, file_offset, chunk_uuid)
-            self.app.Add_To_Output_Queue(peer_uuid, request, 4)
+            self.app.add_to_output_queue(peer_uuid, request, PRIORITY_FILE)
             self.client_downloading_requested_chunks[peer_uuid]\
                 .append(chunk_uuid)
             (time_request_sent, time_request_ack, offset) = \
@@ -399,7 +399,7 @@ class TacoFilesystemManager(threading.Thread):
                     self.files_r[fullpath].seek(offset)
                     chunk_data = self.files_r[fullpath].read(FILESYSTEM_CHUNK_SIZE)
                     request = self.app.commands.request_give_file_chunk_cmd(chunk_data, chunk_uuid)
-                    self.app.Add_To_Output_Queue(peer_uuid, request, 3)
+                    self.app.add_to_output_queue(peer_uuid, request, PRIORITY_LOW)
                     self.sleep.set()
                     self.app.clients.sleep.set()
 
@@ -414,7 +414,7 @@ class TacoFilesystemManager(threading.Thread):
                             self.set_status("RESULTS ready to send:" + str((share_dir, shareuuid)))
                             request = self.app.commands.request_share_listing_result_cmd(share_dir, shareuuid,
                                                                                   self.listings[share_dir])
-                            self.app.Add_To_Output_Queue(peer_uuid, request, 2)
+                            self.app.add_to_output_queue(peer_uuid, request, PRIORITY_MEDIUM)
                             self.app.clients.sleep.set()
                             self.results_to_return.remove([peer_uuid, share_dir, shareuuid])
                             self.sleep.set()

@@ -126,3 +126,16 @@ TRACE = 1
 
 # Indicates there is no identity in a result that usually returns an identity
 NO_IDENTITY = "0"
+
+# The value returned in result by json when an error condition was encountered.
+API_ERROR = "ERROR"
+
+# Highest priority message.
+# TODO: this is not really used in code or any faster.
+PRIORITY_HIGH = 1
+# Common priority message.
+PRIORITY_MEDIUM = 2
+# Low priority message.
+PRIORITY_LOW = 3
+# A file transfer.
+PRIORITY_FILE = 4

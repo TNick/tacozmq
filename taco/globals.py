@@ -7,7 +7,9 @@ from __future__ import print_function
 
 import threading
 
-import taco.constants
+from taco.constants import (
+    APP_NAME, PRIORITY_FILE, PRIORITY_HIGH, PRIORITY_LOW, PRIORITY_MEDIUM
+)
 import logging
 import uuid
 
@@ -169,36 +171,43 @@ class TacoApp(object):
         self.server.start()
         self.clients.start()
 
-    def Add_To_Output_Queue(self, peer_uuid, msg, priority=3):
+    def add_to_output_queue(self, peer_uuid, msg, priority=PRIORITY_LOW):
+        """
+        Appends the message to a particular queue.
+
+        If this particular peer is not present in the queue the
+        function will silently (with an error logged).
+
+        :param peer_uuid: the peer to which the message is destined.
+        :param msg: The message to send; will simply be appended.
+        :param priority: Which queue to add this message to.
+        :return: True if all went well, False otherwise.
+        """
         logger.debug("Add to " + peer_uuid + " output q @ " + str(priority))
-        if priority == 1:
-            with self.high_priority_output_queue_lock:
-                if peer_uuid in self.high_priority_output_queue:
+        try:
+            if priority == PRIORITY_HIGH:
+                with self.high_priority_output_queue_lock:
                     self.high_priority_output_queue[peer_uuid].put(msg)
-                    self.clients.sleep.set()
-                    return 1
-        elif priority == 2:
-            with self.medium_priority_output_queue_lock:
-                if peer_uuid in self.medium_priority_output_queue:
+            elif priority == PRIORITY_MEDIUM:
+                with self.medium_priority_output_queue_lock:
                     self.medium_priority_output_queue[peer_uuid].put(msg)
-                    self.clients.sleep.set()
-                    return 1
-        elif priority == 3:
-            with self.low_priority_output_queue_lock:
-                if peer_uuid in self.low_priority_output_queue:
+            elif priority == PRIORITY_LOW:
+                with self.low_priority_output_queue_lock:
                     self.low_priority_output_queue[peer_uuid].put(msg)
-                    self.clients.sleep.set()
-                    return 1
-        else:
-            with self.file_request_output_queue_lock:
-                if peer_uuid in self.file_request_output_queue:
+            elif priority == PRIORITY_FILE:
+                with self.file_request_output_queue_lock:
                     self.file_request_output_queue[peer_uuid].put(msg)
-                    self.clients.sleep.set()
-                    return 1
+            else:
+                raise ValueError("Unknown priority value %r" % priority)
+            self.clients.sleep.set()
+            return True
+        except KeyError:
+            logger.error("Peer %r not present in %r queue",
+                         peer_uuid, priority)
+            logger.debug("message %r discarded", msg)
+        return False
 
-        return 0
-
-    def Add_To_All_Output_Queues(self, msg, priority=3):
+    def add_to_all_output_queues(self, msg, priority=3):
         logger.debug("Add to ALL output q @ " + str(priority))
         if priority == 1:
             with self.high_priority_output_queue_lock:
@@ -265,7 +274,7 @@ class TacoApp(object):
 
 def proper_exit(signum, frame):
     """ Signal handler. """
-    logger.warning("SIGINT Detected, stopping " + taco.constants.APP_NAME)
+    logger.warning("SIGINT Detected, stopping %s", APP_NAME)
     app = TacoApp.instance
     if app is not None:
         app.proper_exit()
