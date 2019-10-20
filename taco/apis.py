@@ -17,7 +17,9 @@ import sys
 from collections import defaultdict
 
 from taco.globals import TacoApp
-from taco.constants import FILESYSTEM_WORKINPROGRESS_SUFFIX, TRACE
+from taco.constants import (
+    FILESYSTEM_WORKINPROGRESS_SUFFIX, TRACE, API_ERROR, PRIORITY_MEDIUM
+)
 
 logger = logging.getLogger('tacozmq.apis')
 if sys.version_info > (3, 0):
@@ -235,39 +237,75 @@ def upload_q_get(jdata, app):
 
 @post_route("browseresult")
 def browse_result(jdata, app):
-    output = {}
-    data = jdata[u"data"]
-    if isinstance(data, dict):
-        if u"sharedir" in data and u"uuid" in data:
+    """
+    Request to retrieve a result previously asked wit browse()
+
+    """
+    while True:
+        try:
+            peer_uuid = jdata["data"]['uuid']
+            share_dir = jdata["data"]['sharedir']
+        except (KeyError, TypeError):
+            message = "required field missing in request"
+            break
+
+        try:
             with app.share_listings_lock:
-                if (data[u"uuid"], data[u"sharedir"]) \
-                        in app.share_listings:
-                    output = {
-                        "result": app.share_listings[(
-                            data[u"uuid"],
-                            data[u"sharedir"])][1]}
-    return output
+                return {
+                    "result": app.share_listings[(peer_uuid, share_dir)][1]
+                }
+        except KeyError:
+            message = "no such request"
+            break
+
+    logger.error("browse-result request failed (%s)", message)
+    return {
+        "result": API_ERROR,
+        "message": message
+    }
 
 
 @post_route("browse")
 def browse(jdata, app):
-    data = jdata[u"data"]
-    if isinstance(data, dict):
-        if u"uuid" in data and u"sharedir" in data:
-            peer_uuid = data[u"uuid"]
-            sharedir = data[u"sharedir"]
-            browse_result_uuid = uuid.uuid4().hex
-            logger.critical(
-                "Getting Directory Listing from: %s for share: %s",
-                peer_uuid, sharedir)
-            request = TacoApp.instance.commands.request_share_listing_cmd(
-                peer_uuid, sharedir, browse_result_uuid)
-            TacoApp.instance.Add_To_Output_Queue(peer_uuid, request, 2)
-            return {
-                "sharedir": sharedir,
-                "result": browse_result_uuid
-            }
-    return {}
+    """
+    A request to get a directory listing from a peer.
+
+    The directory tree is not cached on local peer. Instead, a request is
+    posted to appropriate peer and the caller gets a result handler.
+    """
+    while True:
+        try:
+            peer_uuid = jdata["data"]['uuid']
+            share_dir = jdata["data"]['sharedir']
+        except (KeyError, TypeError):
+            message = "required field missing in request"
+            break
+
+        if peer_uuid not in app.settings["Peers"]:
+            message = "unknown peer"
+            break
+
+        browse_result_uuid = uuid.uuid4().hex
+        logger.debug(
+            "getting directory listing from %r for share %s with result %r",
+            peer_uuid, share_dir, browse_result_uuid)
+
+        # We request to this peer to give us the data.
+        request = TacoApp.instance.commands.request_share_listing_cmd(
+            peer_uuid, share_dir, browse_result_uuid)
+        TacoApp.instance.add_to_output_queue(
+            peer_uuid, request, PRIORITY_MEDIUM)
+
+        return {
+            "sharedir": share_dir,
+            "result": browse_result_uuid
+        }
+
+    logger.error("browse request failed (%s)", message)
+    return {
+        "result": API_ERROR,
+        "message": message
+    }
 
 
 @post_route("peerstatus")
@@ -281,7 +319,6 @@ def peer_status(jdata, app):
                 outgoing = app.clients.get_client_last_reply(peer_uuid)
                 timediffinc = abs(time.time() - incoming)
                 timediffout = abs(time.time() - outgoing)
-                nickname_status = "Unknown"
                 try:
                     nickname_status = app.settings["Peers"][peer_uuid]["nickname"]
                 except:
@@ -376,7 +413,7 @@ def peer_save(jdata, app):
                         "clientkey": client_pub,
                         "serverkey": server_pub
                     }
-                app.store.save(False)
+                app.store.save(need_lock=False, load_after=True)
             app.restart()
             return 1
     return -1
