@@ -16,6 +16,7 @@ import random
 
 from .constants import *
 from .utils import norm_join, event_monitor
+from taco.thread import TacoThread
 
 if sys.version_info < (3, 0):
     from Queue import Queue
@@ -345,7 +346,7 @@ class Peer(object):
         self.parent.sleep.set()
 
 
-class TacoClients(threading.Thread):
+class TacoClients(TacoThread):
     """
     A thread that manages the communication with peers.
 
@@ -365,20 +366,13 @@ class TacoClients(threading.Thread):
     """
     def __init__(self, app):
         logger.debug('clients manager is being constructed...')
-        threading.Thread.__init__(self, name="thTacoClients")
-        self.app = app
-
-        # Set this to terminate the thread.
-        self.stop = threading.Event()
+        super(TacoClients, self).__init__(app, name="thTacoClients")
 
         # The inner loop sleeps on each loop 0.1 seconds. Methods that
         # Expect some data right away can prevent next loop from sleeping
         # by setting this event.
         self.sleep = threading.Event()
 
-        self.status_lock = threading.Lock()
-        self.status = ""
-        self.status_time = -1
         self.next_request = ""
 
         # A dict with keys being peer uuids and keys being Peer instances.
@@ -527,16 +521,6 @@ class TacoClients(threading.Thread):
         return [
             peer_uuid for peer_uuid in self.app.settings["Peers"]
             if self.is_client_responsive(peer_uuid)]
-
-    def set_status(self, text, level=logging.DEBUG):
-        logger.log(level, text)
-        with self.status_lock:
-            self.status = text
-            self.status_time = time.time()
-
-    def get_status(self):
-        with self.status_lock:
-            return self.status, self.status_time
 
     def run_peer(self, peer_uuid, client_ctx, poller):
         """ Executed as part of the state update for each enabled peer. """

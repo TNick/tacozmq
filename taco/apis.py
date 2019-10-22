@@ -153,6 +153,8 @@ def download_q_move(jdata, app):
             filesize = int(data["filesize"])
             filemod = float(data["filemodtime"])
             newloc = int(data["newloc"])
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except Exception:
             return -1
     else:

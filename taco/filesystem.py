@@ -14,6 +14,7 @@ import uuid
 
 from taco.constants import *
 from taco.utils import norm_join
+from taco.thread import TacoThread
 
 logger = logging.getLogger('tacozmq.fs')
 if sys.version_info < (3, 0):
@@ -136,6 +137,8 @@ elif os.name == 'posix':
             free = data.f_bavail * data.f_frsize
             total = data.f_blocks * data.f_frsize
             return free, total
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except Exception:
             return 0, 0
 
@@ -165,17 +168,11 @@ def convert_path_to_share(app, share):
     return return_val
 
 
-class TacoFilesystemManager(threading.Thread):
+class TacoFilesystemManager(TacoThread):
     def __init__(self, app):
-        threading.Thread.__init__(self, name="thTacoFS")
-        self.app = app
+        super(TacoFilesystemManager, self).__init__("thTacoFS")
 
-        self.stop = threading.Event()
         self.sleep = threading.Event()
-
-        self.status_lock = threading.Lock()
-        self.status = ""
-        self.status_time = -1
 
         self.workers = []
         self.last_purge = time.time()
@@ -270,23 +267,6 @@ class TacoFilesystemManager(threading.Thread):
         with self.listings_lock:
             self.listings[share_dir] = [the_time, dirs, files]
 
-    def set_status(self, text, level=0):
-        if level == 1:
-            logger.info(text)
-        elif level == 0:
-            logger.debug(text)
-        elif level == 2:
-            logger.warning(text)
-        elif level == 3:
-            logger.error(text)
-        with self.status_lock:
-            self.status = text
-            self.status_time = time.time()
-
-    def get_status(self):
-        with self.status_lock:
-            return self.status, self.status_time
-
     def peer_is_downloading(self, peer_uuid):
         return len(self.client_downloading_pending_chunks[peer_uuid]) > 0 \
                and len(self.client_downloading_requested_chunks[peer_uuid]
@@ -371,6 +351,8 @@ class TacoFilesystemManager(threading.Thread):
 
             try:
                 current_size = os.path.getsize(file_name_incomplete)
+            except (SystemExit, KeyboardInterrupt):
+                raise
             except Exception:
                 current_size = 0
 
@@ -651,38 +633,19 @@ class TacoFilesystemManager(threading.Thread):
                         peer_uuid, local_copy_download_directory)
 
 
-class TacoFilesystemWorker(threading.Thread):
+class TacoFilesystemWorker(TacoThread):
     """ What we seem to have here is a very fancy, very threaded way of
     listing directories. No less than 4 threads are working assiduously at this
     holly task. """
     def __init__(self, app, worker_id):
-        threading.Thread.__init__(self, name="thTacoFS-%r" % worker_id)
-        self.app = app
-
-        self.stop = threading.Event()
+        super(TacoFilesystemWorker, self).__init__(
+            app, name="thTacoFS-%r" % worker_id)
 
         self.worker_id = worker_id
 
         self.status_lock = threading.Lock()
         self.status = ""
         self.status_time = -1
-
-    def set_status(self, text, level=0):
-        if level == 1:
-            logger.info(text)
-        elif level == 0:
-            logger.debug(text)
-        elif level == 2:
-            logger.warning(text)
-        elif level == 3:
-            logger.error(text)
-        with self.status_lock:
-            self.status = text
-            self.status_time = time.time()
-
-    def get_status(self):
-        with self.status_lock:
-            return self.status, self.status_time
 
     def run(self):
         self.set_status("Starting Filesystem Worker #" + str(self.worker_id))
@@ -707,6 +670,8 @@ class TacoFilesystemWorker(threading.Thread):
                     continue
                 assert is_path_under_share(self.app, directory)
                 assert os.path.isdir(directory)
+            except (SystemExit, KeyboardInterrupt):
+                break
             except Exception:
                 continue
 
@@ -716,6 +681,8 @@ class TacoFilesystemWorker(threading.Thread):
             files = []
             try:
                 dir_list = os.listdir(directory)
+            except (SystemExit, KeyboardInterrupt):
+                raise
             except Exception:
                 results = [0, time.time(), root_share_dir, [], []]
             else:
@@ -731,6 +698,8 @@ class TacoFilesystemWorker(threading.Thread):
                     dirs.sort()
                     files.sort()
                     results = [1, time.time(), root_share_dir, dirs, files]
+                except (SystemExit, KeyboardInterrupt):
+                    break
                 except Exception:
                     logger.exception("Failed to obtain the list of files")
                     results = [0, time.time(), root_share_dir, [], []]

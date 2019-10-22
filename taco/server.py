@@ -13,13 +13,15 @@ from zmq.auth.thread import ThreadAuthenticator
 
 from taco.constants import KEY_GENERATION_PREFIX, KEY_SERVER_SECRET_SUFFIX
 from .utils import event_monitor, norm_join
+from taco.thread import TacoThread
+
 from .constants import TRACE, NO_IDENTITY
 
 
 logger = logging.getLogger('tacozmq.server')
 
 
-class TacoServer(threading.Thread):
+class TacoServer(TacoThread):
     """
     A thread that manages our reply server.
 
@@ -46,8 +48,7 @@ class TacoServer(threading.Thread):
         """
         logger.debug('server %r:%r is being constructed...',
                      bind_ip, bind_port)
-        threading.Thread.__init__(self, name="thTacoServer")
-        self.app = app
+        super(TacoServer, self).__init__(app, name="thTacoServer")
 
         # TODO: in current implementation this may be None
         # as this only gets the parameters from command line.
@@ -55,13 +56,6 @@ class TacoServer(threading.Thread):
         # these are read from settings. I see no reason for delaying this.
         self.bind_ip = bind_ip
         self.bind_port = bind_port
-
-        # Set this to terminate the thread.
-        self.stop = threading.Event()
-
-        self.status_lock = threading.Lock()
-        self.status = ""
-        self.status_time = -1
 
         self.client_last_request_time = {}
         self.client_last_request_time_lock = threading.Lock()
@@ -241,14 +235,4 @@ class TacoServer(threading.Thread):
             if peer_uuid in self.client_last_request_time:
                 return self.client_last_request_time[peer_uuid]
         return -1
-
-    def set_status(self, text, level=logging.INFO):
-        logger.log(level, text)
-        with self.status_lock:
-            self.status = text
-            self.status_time = time.time()
-
-    def get_status(self):
-        with self.status_lock:
-            return self.status, self.status_time
 

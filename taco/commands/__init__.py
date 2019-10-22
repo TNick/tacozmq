@@ -99,6 +99,8 @@ class TacoCommands(
         """
         try:
             unpacked = unpackb(packed)
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except Exception:
             logger.error("data could not be unpacked", exc_info=True)
             return NO_IDENTITY, None
@@ -125,6 +127,8 @@ class TacoCommands(
         # execute and return packed data.
         try:
             return identity, packb(func(self, identity, trunk))
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except Exception:
             logger.error("Exception while processing request %r from %r",
                          req_code, identity,
@@ -149,6 +153,8 @@ class TacoCommands(
         """
         try:
             unpacked = unpackb(packed)
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except Exception:
             logger.error("data could not be unpacked", exc_info=True)
             return None
@@ -175,6 +181,8 @@ class TacoCommands(
         # execute and return packed data.
         try:
             return func(self, peer_uuid, trunk)
+        except (SystemExit, KeyboardInterrupt):
+            raise
         except Exception:
             logger.error("Exception while processing reply %r from %r",
                          reply_code, peer_uuid,
