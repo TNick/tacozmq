@@ -209,6 +209,63 @@ class TacoFilesystemManager(threading.Thread):
         self.files_r_last_access = {}
         self.files_w_last_access = {}
 
+    def create(self):
+        """ Called at thread start to initialize the state. """
+        self.set_status("Starting Up Filesystem Manager")
+
+        for i in range(FILESYSTEM_WORKER_COUNT):
+            self.workers.append(TacoFilesystemWorker(self.app, i))
+
+        for i in self.workers:
+            i.start()
+
+    def terminate(self):
+        """ Called at thread end to free resources. """
+        self.set_status("Killing Workers")
+        for i in self.workers:
+            i.stop.set()
+        for i in self.workers:
+            i.join()
+        self.set_status("Closing Open Files")
+        for file_name in self.files_r:
+            self.files_r[file_name].close()
+        for file_name in self.files_w:
+            self.files_w[file_name].close()
+        self.set_status("Filesystem Manager Exit")
+
+    def run(self):
+        """ Thread main function. """
+        self.create()
+
+        while not self.stop.is_set():
+            # self.set_status("FILESYS")
+            self.sleep.wait(0.2)
+            self.sleep.clear()
+            if self.stop.is_set():
+                break
+
+            self.download_quque_state()
+            for peer_uuid in self.client_downloading:
+                if self.client_downloading[peer_uuid] == 0:
+                    continue
+                self.peer_download(peer_uuid)
+            self.requests_ack()
+            self.last_received_chunk()
+            self.process_client_downloading()
+
+            if self.stop.is_set():
+                break
+
+            if not self.outgoing_chunks():
+                break
+
+            self.return_results()
+            self.cache_purge()
+            self.share_listing()
+            self.listing_results()
+
+        self.terminate()
+
     def add_listing(self, the_time, share_dir, dirs, files):
         with self.listings_lock:
             self.listings[share_dir] = [the_time, dirs, files]
@@ -236,6 +293,7 @@ class TacoFilesystemManager(threading.Thread):
                        ) < FILESYSTEM_CREDIT_MAX
 
     def peer_download(self, peer_uuid):
+        """ Send out requests for downloads. """
         (share_dir, file_name, file_size, file_mod) = \
             self.client_downloading[peer_uuid]
         while self.peer_is_downloading(peer_uuid):
@@ -365,227 +423,6 @@ class TacoFilesystemManager(threading.Thread):
 
                 del self.app.download_q[peer_uuid][0]
 
-    def run(self):
-        self.set_status("Starting Up Filesystem Manager")
-
-        for i in range(FILESYSTEM_WORKER_COUNT):
-            self.workers.append(TacoFilesystemWorker(self.app, i))
-
-        for i in self.workers:
-            i.start()
-
-        while not self.stop.is_set():
-            # self.set_status("FILESYS")
-            self.sleep.wait(0.2)
-            self.sleep.clear()
-            if self.stop.is_set():
-                break
-
-            # CHECK downloadq state
-            if time.time() >= self.download_q_check_time:
-                # self.set_status("Checking if the download q is in a good state")
-                with self.app.settings_lock:
-                    local_copy_download_directory = \
-                        os.path.normpath(self.app.settings["Download Location"])
-                self.download_q_check_time = time.time() + DOWNLOAD_Q_CHECK_TIME
-
-                # check for download q items
-                with self.app.download_q_lock:
-                    for peer_uuid in self.app.download_q.keys():
-                        self.peer_q_download(
-                            peer_uuid, local_copy_download_directory)
-
-            # send out requests for downloads
-            for peer_uuid in self.client_downloading:
-                if self.client_downloading[peer_uuid] == 0:
-                    continue
-                self.peer_download(peer_uuid)
-
-            # check for chunk ack
-            time_request_sent = -1
-            while not self.chunk_requests_ack_queue.empty():
-                try:
-                    (peer_uuid, chunk_uuid) = self.chunk_requests_ack_queue.get(0)
-                except:
-                    break
-
-                if peer_uuid in self.client_downloading_requested_chunks and chunk_uuid in \
-                        self.client_downloading_requested_chunks[
-                            peer_uuid] and peer_uuid in self.client_downloading_status:
-
-                    (time_request_sent, time_request_ack, offset) = self.client_downloading_status[peer_uuid][
-                        chunk_uuid]
-                    self.client_downloading_status[peer_uuid][chunk_uuid] = (time_request_sent, time.time(), offset)
-                    self.set_status(
-                        "File Chunk request has been ACK'D:" + str((peer_uuid, time_request_sent, chunk_uuid)))
-                    self.sleep.set()
-                else:
-                    self.set_status(
-                        "File Chunk request SHOULD HAVE been ACK'D:" + str((peer_uuid, time_request_sent, chunk_uuid)))
-
-            for peer_uuid in self.client_downloading_chunks_last_received:
-                if peer_uuid in self.client_downloading and self.client_downloading[peer_uuid] != 0:
-                    if abs(time.time() - self.client_downloading_chunks_last_received[
-                        peer_uuid]) > DOWNLOAD_Q_WAIT_FOR_DATA:
-                        self.set_status("Download Borked for: " + peer_uuid)
-                        self.client_downloading[peer_uuid] = 0
-
-            # chunk data has been received
-            while not self.chunk_requests_incoming_queue.empty():
-                if self.stop.is_set():
-                    break
-
-                try:
-                    (peer_uuid, chunk_uuid, data) = self.chunk_requests_incoming_queue.get(0)
-                except:
-                    break
-
-                if peer_uuid in self.client_downloading_requested_chunks and chunk_uuid in \
-                        self.client_downloading_requested_chunks[
-                            peer_uuid] and peer_uuid in self.client_downloading_file_name:
-
-                    if peer_uuid in self.client_downloading and self.client_downloading[peer_uuid] == 0:
-                        continue
-
-                    self.set_status("Chunk data has been received: " + str((peer_uuid, chunk_uuid, len(data))))
-                    self.client_downloading_chunks_last_received[peer_uuid] = time.time()
-                    (share_dir, file_name, file_size, file_mod) = self.client_downloading[peer_uuid]
-                    fullpath = self.client_downloading_file_name[peer_uuid]
-                    if fullpath not in self.files_w.keys():
-                        self.files_w[fullpath] = open(fullpath, "ab")
-                    self.files_w_last_access[fullpath] = time.time()
-                    self.files_w[fullpath].write(data)
-                    self.files_w[fullpath].flush()
-                    if self.files_w[fullpath].tell() >= file_size:
-                        self.files_w[fullpath].close()
-                        del self.files_w[fullpath]
-                    del self.client_downloading_status[peer_uuid][chunk_uuid]
-                    self.client_downloading_requested_chunks[peer_uuid].remove(chunk_uuid)
-                    self.sleep.set()
-                else:
-                    self.set_status("Got a chunk, but it's bogus:" + str((peer_uuid, chunk_uuid, len(data))))
-
-            if self.stop.is_set():
-                break
-
-            # chunk data has been requested
-            if not self.chunk_requests_outgoing_queue.empty():
-                if self.stop.is_set():
-                    break
-
-                try:
-                    (peer_uuid, share_dir, file_name, offset, chunk_uuid) = self.chunk_requests_outgoing_queue.get(0)
-                except:
-                    break
-
-                self.set_status(
-                    "Need to send a chunk of data: " + str((peer_uuid, share_dir, file_name, offset, chunk_uuid)))
-
-                root_share_name = share_dir.split("/")[1]
-                root_path = os.path.normpath("/" + "/".join(share_dir.split("/")[2:]) + "/")
-                directory = os.path.normpath(convert_path_to_share(self.app, root_share_name) + "/" + root_path)
-                fullpath = os.path.normpath(directory + "/" + file_name)
-
-                if not is_path_under_share(self.app, os.path.dirname(fullpath)):
-                    break
-
-                if not os.path.isdir(directory):
-                    break
-
-                if fullpath not in self.files_r.keys():
-                    self.set_status("I need to open a file for reading:" + fullpath)
-                    self.files_r[fullpath] = open(fullpath, "rb")
-
-                self.files_r_last_access[fullpath] = time.time()
-                if offset < os.path.getsize(fullpath):
-                    self.files_r[fullpath].seek(offset)
-                    chunk_data = self.files_r[fullpath].read(FILESYSTEM_CHUNK_SIZE)
-                    request = self.app.commands.request_give_file_chunk_cmd(chunk_data, chunk_uuid)
-                    self.app.add_to_output_queue(peer_uuid, request, PRIORITY_LOW)
-                    self.sleep.set()
-                    self.app.clients.sleep.set()
-
-            if self.stop.is_set():
-                break
-
-            if len(self.results_to_return) > 0:
-                # self.set_status("There are results that need to be sent once they are ready")
-                with self.listings_lock:
-                    for [peer_uuid, share_dir, shareuuid] in self.results_to_return:
-                        if share_dir in self.listings.keys():
-                            self.set_status("RESULTS ready to send:" + str((share_dir, shareuuid)))
-                            request = self.app.commands.request_share_listing_result_cmd(
-                                share_dir, shareuuid, self.listings[share_dir])
-                            self.app.add_to_output_queue(
-                                peer_uuid, request, PRIORITY_MEDIUM)
-                            self.app.clients.sleep.set()
-                            self.results_to_return.remove(
-                                [peer_uuid, share_dir, shareuuid])
-                            self.sleep.set()
-
-            if abs(time.time() - self.last_purge) > FILESYSTEM_CACHE_PURGE:
-                # self.set_status("Purging old filesystem results")
-                self.last_purge = time.time()
-
-                for file_name in self.files_r_last_access.keys():
-                    if abs(time.time() - self.files_r_last_access[file_name]) > FILESYSTEM_CACHE_TIMEOUT:
-                        if file_name in self.files_r.keys():
-                            self.set_status("Closing a file for reading due to inactivity:" + file_name)
-                            self.files_r[file_name].close()
-                            del self.files_r[file_name]
-                        del self.files_r_last_access[file_name]
-
-                for file_name in self.files_w_last_access.keys():
-                    if abs(time.time() - self.files_w_last_access[file_name]) > FILESYSTEM_CACHE_TIMEOUT:
-                        if file_name in self.files_w.keys():
-                            self.set_status("Closing a file for writing due to inactivity:" + file_name)
-                            self.files_w[file_name].close()
-                            del self.files_w[file_name]
-                        del self.files_w_last_access[file_name]
-
-                with self.app.share_listings_lock:
-                    for iterkey in self.app.share_listings.keys():
-                        if abs(time.time() - self.app.share_listings[iterkey][0]) > FILESYSTEM_CACHE_TIMEOUT:
-                            self.set_status("Purging old local filesystem cached results")
-                            del self.app.share_listings[iterkey]
-
-                with self.listings_lock:
-                    for share_dir in self.listings.keys():
-                        [the_time, dirs, files] = self.listings[share_dir]
-                        if abs(time.time() - the_time) > FILESYSTEM_CACHE_TIMEOUT:
-                            self.set_status("Purging Filesystem cache for share: " + share_dir)
-                            del self.listings[share_dir]
-
-                with self.app.share_listings_mine_lock:
-                    for share_listing_uuid in self.app.share_listings_mine.keys():
-                        the_time = self.app.share_listings_mine[share_listing_uuid]
-                        if abs(time.time() - the_time) > FILESYSTEM_LISTING_TIMEOUT:
-                            self.set_status("Purging Filesystem listing i care about for: " + share_listing_uuid)
-                            del self.app.share_listings_mine[share_listing_uuid]
-
-            with self.app.share_listing_requests_lock:
-                for peer_uuid in self.app.share_listing_requests:
-                    while not self.app.share_listing_requests[peer_uuid].empty():
-                        self.perform_share_listing_requests(peer_uuid)
-
-            while not self.listing_results_queue.empty():
-                (success, the_time, share_dir, dirs, files) = self.listing_results_queue.get()
-                self.set_status("Processing a worker result: " + share_dir)
-                self.add_listing(the_time, share_dir, dirs, files)
-                self.sleep.set()
-
-        self.set_status("Killing Workers")
-        for i in self.workers:
-            i.stop.set()
-        for i in self.workers:
-            i.join()
-        self.set_status("Closing Open Files")
-        for file_name in self.files_r:
-            self.files_r[file_name].close()
-        for file_name in self.files_w:
-            self.files_w[file_name].close()
-        self.set_status("Filesystem Manager Exit")
-
     def perform_share_listing_requests(self, peer_uuid):
         share_dir, shareuuid = \
             self.app.share_listing_requests[peer_uuid].get()
@@ -601,7 +438,6 @@ class TacoFilesystemManager(threading.Thread):
         # else:
         #     # asking about a directory
 
-
         root_share_dir = os.path.normpath(share_dir)
         root_share_name = root_share_dir.split("/")[1]
         root_path = os.path.normpath("/" + "/".join(root_share_dir.split("/")[2:]) + "/")
@@ -611,6 +447,208 @@ class TacoFilesystemManager(threading.Thread):
             self.results_to_return.append([peer_uuid, share_dir, shareuuid])
         else:
             self.set_status("User has requested a bogus share: " + str(share_dir))
+
+    def outgoing_chunks(self):
+        # chunk data has been requested
+        if self.chunk_requests_outgoing_queue.empty():
+            return True
+
+        if self.stop.is_set():
+            return False
+
+        try:
+            (peer_uuid, share_dir, file_name, offset, chunk_uuid) = \
+                self.chunk_requests_outgoing_queue.get(0)
+        except:
+            return False
+
+        self.set_status(
+            "Need to send a chunk of data: " + str(
+                (peer_uuid, share_dir, file_name, offset, chunk_uuid)))
+
+        root_share_name = share_dir.split("/")[1]
+        root_path = os.path.normpath(
+            "/" + "/".join(share_dir.split("/")[2:]) + "/")
+        directory = os.path.normpath(convert_path_to_share(
+            self.app, root_share_name) + "/" + root_path)
+        fullpath = os.path.normpath(directory + "/" + file_name)
+
+        if not is_path_under_share(self.app, os.path.dirname(fullpath)):
+            return False
+
+        if not os.path.isdir(directory):
+            return False
+
+        if fullpath not in self.files_r.keys():
+            self.set_status("I need to open a file for reading:" + fullpath)
+            self.files_r[fullpath] = open(fullpath, "rb")
+
+        self.files_r_last_access[fullpath] = time.time()
+        if offset < os.path.getsize(fullpath):
+            self.files_r[fullpath].seek(offset)
+            chunk_data = self.files_r[fullpath].read(FILESYSTEM_CHUNK_SIZE)
+            request = self.app.commands.request_give_file_chunk_cmd(
+                chunk_data, chunk_uuid)
+            self.app.add_to_output_queue(peer_uuid, request, PRIORITY_LOW)
+            self.sleep.set()
+            self.app.clients.sleep.set()
+
+        if self.stop.is_set():
+            return False
+
+        return True
+
+    def return_results(self):
+        if len(self.results_to_return) > 0:
+            # self.set_status("There are results that need to be sent once they are ready")
+            with self.listings_lock:
+                for [peer_uuid, share_dir, shareuuid] in self.results_to_return:
+                    if share_dir in self.listings.keys():
+                        self.set_status("RESULTS ready to send:" + str((share_dir, shareuuid)))
+                        request = self.app.commands.request_share_listing_result_cmd(
+                            share_dir, shareuuid, self.listings[share_dir])
+                        self.app.add_to_output_queue(
+                            peer_uuid, request, PRIORITY_MEDIUM)
+                        self.app.clients.sleep.set()
+                        self.results_to_return.remove(
+                            [peer_uuid, share_dir, shareuuid])
+                        self.sleep.set()
+
+    def cache_purge(self):
+        if abs(time.time() - self.last_purge) > FILESYSTEM_CACHE_PURGE:
+            # self.set_status("Purging old filesystem results")
+            self.last_purge = time.time()
+
+            for file_name in self.files_r_last_access.keys():
+                if abs(time.time() - self.files_r_last_access[file_name]) > FILESYSTEM_CACHE_TIMEOUT:
+                    if file_name in self.files_r.keys():
+                        self.set_status("Closing a file for reading due to inactivity:" + file_name)
+                        self.files_r[file_name].close()
+                        del self.files_r[file_name]
+                    del self.files_r_last_access[file_name]
+
+            for file_name in self.files_w_last_access.keys():
+                if abs(time.time() - self.files_w_last_access[file_name]) > FILESYSTEM_CACHE_TIMEOUT:
+                    if file_name in self.files_w.keys():
+                        self.set_status("Closing a file for writing due to inactivity:" + file_name)
+                        self.files_w[file_name].close()
+                        del self.files_w[file_name]
+                    del self.files_w_last_access[file_name]
+
+            with self.app.share_listings_lock:
+                for iterkey in self.app.share_listings.keys():
+                    if abs(time.time() - self.app.share_listings[iterkey][0]) > FILESYSTEM_CACHE_TIMEOUT:
+                        self.set_status("Purging old local filesystem cached results")
+                        del self.app.share_listings[iterkey]
+
+            with self.listings_lock:
+                for share_dir in self.listings.keys():
+                    [the_time, dirs, files] = self.listings[share_dir]
+                    if abs(time.time() - the_time) > FILESYSTEM_CACHE_TIMEOUT:
+                        self.set_status("Purging Filesystem cache for share: " + share_dir)
+                        del self.listings[share_dir]
+
+            with self.app.share_listings_mine_lock:
+                for share_listing_uuid in self.app.share_listings_mine.keys():
+                    the_time = self.app.share_listings_mine[share_listing_uuid]
+                    if abs(time.time() - the_time) > FILESYSTEM_LISTING_TIMEOUT:
+                        self.set_status("Purging Filesystem listing i care about for: " + share_listing_uuid)
+                        del self.app.share_listings_mine[share_listing_uuid]
+
+    def share_listing(self):
+        with self.app.share_listing_requests_lock:
+            for peer_uuid in self.app.share_listing_requests:
+                while not self.app.share_listing_requests[peer_uuid].empty():
+                    self.perform_share_listing_requests(peer_uuid)
+
+    def listing_results(self):
+        while not self.listing_results_queue.empty():
+            (success, the_time, share_dir, dirs, files) = self.listing_results_queue.get()
+            self.set_status("Processing a worker result: " + share_dir)
+            self.add_listing(the_time, share_dir, dirs, files)
+            self.sleep.set()
+
+    def process_client_downloading(self):
+        """ chunk data has been received. """
+        while not self.chunk_requests_incoming_queue.empty():
+            if self.stop.is_set():
+                break
+            try:
+                (peer_uuid, chunk_uuid, data) = \
+                    self.chunk_requests_incoming_queue.get(0)
+            except:
+                break
+
+            if peer_uuid in self.client_downloading_requested_chunks and chunk_uuid in \
+                    self.client_downloading_requested_chunks[
+                        peer_uuid] and peer_uuid in self.client_downloading_file_name:
+
+                if peer_uuid in self.client_downloading and self.client_downloading[peer_uuid] == 0:
+                    return
+
+                self.set_status("Chunk data has been received: " + str((peer_uuid, chunk_uuid, len(data))))
+                self.client_downloading_chunks_last_received[peer_uuid] = time.time()
+                (share_dir, file_name, file_size, file_mod) = self.client_downloading[peer_uuid]
+                fullpath = self.client_downloading_file_name[peer_uuid]
+                if fullpath not in self.files_w.keys():
+                    self.files_w[fullpath] = open(fullpath, "ab")
+                self.files_w_last_access[fullpath] = time.time()
+                self.files_w[fullpath].write(data)
+                self.files_w[fullpath].flush()
+                if self.files_w[fullpath].tell() >= file_size:
+                    self.files_w[fullpath].close()
+                    del self.files_w[fullpath]
+                del self.client_downloading_status[peer_uuid][chunk_uuid]
+                self.client_downloading_requested_chunks[peer_uuid].remove(chunk_uuid)
+                self.sleep.set()
+            else:
+                self.set_status("Got a chunk, but it's bogus:" + str((peer_uuid, chunk_uuid, len(data))))
+
+    def last_received_chunk(self):
+        for peer_uuid in self.client_downloading_chunks_last_received:
+            if peer_uuid in self.client_downloading and self.client_downloading[peer_uuid] != 0:
+                if abs(time.time() - self.client_downloading_chunks_last_received[
+                    peer_uuid]) > DOWNLOAD_Q_WAIT_FOR_DATA:
+                    self.set_status("Download Borked for: " + peer_uuid)
+                    self.client_downloading[peer_uuid] = 0
+
+    def requests_ack(self):
+        """  check for chunk ack """
+        time_request_sent = -1
+        while not self.chunk_requests_ack_queue.empty():
+            try:
+                (peer_uuid, chunk_uuid) = self.chunk_requests_ack_queue.get(0)
+            except:
+                break
+
+            if peer_uuid in self.client_downloading_requested_chunks and chunk_uuid in \
+                    self.client_downloading_requested_chunks[
+                        peer_uuid] and peer_uuid in self.client_downloading_status:
+
+                (time_request_sent, time_request_ack, offset) = self.client_downloading_status[peer_uuid][
+                    chunk_uuid]
+                self.client_downloading_status[peer_uuid][chunk_uuid] = (time_request_sent, time.time(), offset)
+                self.set_status(
+                    "File Chunk request has been ACK'D:" + str((peer_uuid, time_request_sent, chunk_uuid)))
+                self.sleep.set()
+            else:
+                self.set_status(
+                    "File Chunk request SHOULD HAVE been ACK'D:" + str((peer_uuid, time_request_sent, chunk_uuid)))
+
+    def download_quque_state(self):
+        """ Check download queue state. """
+        if time.time() >= self.download_q_check_time:
+            # self.set_status("Checking if the download q is in a good state")
+            with self.app.settings_lock:
+                local_copy_download_directory = \
+                    os.path.normpath(self.app.settings["Download Location"])
+            self.download_q_check_time = time.time() + DOWNLOAD_Q_CHECK_TIME
+
+            # check for download q items
+            with self.app.download_q_lock:
+                for peer_uuid in self.app.download_q.keys():
+                    self.peer_q_download(
+                        peer_uuid, local_copy_download_directory)
 
 
 class TacoFilesystemWorker(threading.Thread):

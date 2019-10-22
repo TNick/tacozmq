@@ -65,7 +65,7 @@ FILESYSTEM_WORKER_COUNT = 4
 FILESYSTEM_RESULTS_SIZE = 16
 FILESYSTEM_CHUNK_SIZE = KB * 128
 FILESYSTEM_CREDIT_MAX = 35
-FILESYSTEM_WORKINPROGRESS_SUFFIX = u".filepart"
+FILESYSTEM_WORKINPROGRESS_SUFFIX = ".filepart"
 
 DOWNLOAD_Q_CHECK_TIME = 2
 DOWNLOAD_Q_WAIT_FOR_ACK = 30
@@ -118,8 +118,8 @@ RE_IP_CHECKER = "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|
 UUID_CHECKER = re.compile(RE_UUID_CHECKER, re.UNICODE)
 NICKNAME_CHECKER = re.compile(RE_NICKNAME_CHECKER, re.UNICODE)
 CHAT_CHECKER = re.compile(RE_CHAT_CHECKER, re.UNICODE)
-SHARE_NAME_CHECKER = re.compile(u"^\w[\w \-\.]{1,126}\w$", re.UNICODE)
-DIR_NAME_CHECKER = re.compile(u"^\w[\w \-\.]{1,126}\w$", re.UNICODE)
+SHARE_NAME_CHECKER = re.compile("^\w[\w \-\.]{1,126}\w$", re.UNICODE)
+DIR_NAME_CHECKER = re.compile("^\w[\w \-\.]{1,126}\w$", re.UNICODE)
 
 # The most verbose level for logging.
 TRACE = 1
