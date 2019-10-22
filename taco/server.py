@@ -168,6 +168,7 @@ class TacoServer(TacoThread):
 
         while not self.stop.is_set():
             reply = ""
+            client_uuid = None
             try:
                 socks = dict(poller.poll(200))
             except zmq.ZMQError:
@@ -188,9 +189,9 @@ class TacoServer(TacoThread):
                 with self.app.download_limiter_lock:
                     self.app.download_limiter.add(len(data))
                 (client_uuid, reply) = self.app.commands.process_request(data)
-                logger.log(TRACE, 'response to client_uuid %s has %d bytes',
-                           client_uuid, len(reply))
                 if client_uuid != NO_IDENTITY:
+                    logger.log(TRACE, 'response to client_uuid %s has %d bytes',
+                               client_uuid, len(reply))
                     self.set_client_last_request(client_uuid)
 
             try:
@@ -200,14 +201,23 @@ class TacoServer(TacoThread):
                 socks = {}
 
             if self.socket in socks and socks[self.socket] == zmq.POLLOUT:
-                logger.log(TRACE, 'responding to client_uuid %s', client_uuid)
-                with self.app.upload_limiter_lock:
-                    self.app.upload_limiter.add(len(reply))
-                self.socket.send(reply)
-            elif len(reply) > 0:
-                logger.error(
-                    'got reply <%r> to send but socket is in invalid state',
-                    reply)
+                if client_uuid is None or reply is None:
+                    # logger.error(
+                    #     'the socket expects a reply but we got nothing')
+                    pass
+                else:
+                    if len(reply) == 0:
+                        logger.warning("empty reply")
+                    logger.log(TRACE, 'responding to client_uuid %s',
+                               client_uuid)
+                    with self.app.upload_limiter_lock:
+                        self.app.upload_limiter.add(len(reply))
+                    self.socket.send(reply)
+            else:
+                if reply is not None and len(reply) > 0:
+                    logger.error(
+                        'got reply <%r> to send but socket is in invalid state',
+                        reply)
 
         self.terminate()
 

@@ -102,6 +102,10 @@ NET_REPLY_SHARE_LISTING = "D"
 NET_REQUEST_SHARE_LISTING_RESULTS = "e"
 NET_REPLY_SHARE_LISTING_RESULTS = "E"
 
+NET_REQUEST_START_DOWNLOAD = "f"
+NET_REPLY_START_DOWNLOAD = "F"
+
+
 NET_REQUEST_GET_FILE_CHUNK = "x"
 NET_REPLY_GET_FILE_CHUNK = "X"
 
@@ -142,3 +146,15 @@ PRIORITY_MEDIUM = 2
 PRIORITY_LOW = 3
 # A file transfer.
 PRIORITY_FILE = 4
+
+# The transfer is in an initial state.
+TRANSFER_INIT = 0
+# The transfer has been acknowledged by the other party
+# and will start as soon as possible.
+TRANSFER_ACK = 1
+# The transfer is in progress.
+TRANSFER_IN_PROGRESS = 2
+# The transfer could not be completed.
+TRANSFER_FAILED = -2
+# The transfer could not be completed.
+TRANSFER_COMPLETED = 3

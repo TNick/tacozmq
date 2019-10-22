@@ -31,11 +31,44 @@ function dir_click() {
   });
 }
 
-
 /**
  * Handler for click event on adding to queue.
  */
 function add_to_queue_click(event) {
+  event.stopPropagation();
+  $(this).find("span").toggleClass("glyphicon-refresh glyphicon-plus spinner");
+  let buttonthis = $(this);
+
+  $.ajax({
+    url: "/api.post",
+    type: "POST",
+    data: JSON.stringify({
+      "action": "download_file",
+      "peer": $(this).closest(".fileclick").data("uuid"),
+      "path": atob($(this).closest(".fileclick").data("sharedir"))
+    }),
+    contentType: "application/json; charset=utf-8",
+    dataType: "json",
+    error: API_Alert,
+    success: function (data) {
+      console.log(`add_to_queue_click result = ${data}`)
+      if (data["result"] == "OK") {
+        buttonthis.find("span").addClass("spinner glyphicon-refresh glyphicon-ok");
+        buttonthis.addClass("btn-success");
+      } else {
+        buttonthis.find("span").addClass("spinner glyphicon-refresh glyphicon-remove");
+        buttonthis.addClass("btn-danger");
+        console.log(data["message"]);
+      }
+      buttonthis.unbind("click");
+    }
+  });
+}
+
+/**
+ * Handler for click event on adding to queue.
+ */
+function add_to_queue_click_old(event) {
   event.stopPropagation();
   $(this).find("span").toggleClass("glyphicon-refresh glyphicon-plus spinner");
   let filename = $(this).closest(".fileclick").data("filename");

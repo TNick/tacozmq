@@ -13,12 +13,13 @@ from taco.constants import (
 import logging
 import uuid
 
+from taco.filesystem.download_manager import DownloadManager
 from .utils import ShutDownException, norm_join
 
 logger = logging.getLogger('tacozmq.app')
 
 
-class TacoApp(object):
+class TacoApp(DownloadManager):
     """
     Our application.
 
@@ -89,6 +90,9 @@ class TacoApp(object):
         self.web_host = web_host
         self.web_port = web_port
 
+        from taco.commands import TacoCommands
+        self.commands = TacoCommands(self)
+
         from taco.settings import TacoSettings
         self.store = TacoSettings(self)
         self.store.load()
@@ -112,13 +116,14 @@ class TacoApp(object):
         self.filesys = TacoFilesystemManager(self)
         self.filesys.start()
 
-        from taco.commands import TacoCommands
-        self.commands = TacoCommands(self)
-
         from taco.routes import create_bottle
         self.bottle = create_bottle(self)
         self.bottle_server = None
         self.cherry = None
+
+        from taco.filesystem.downloader import FileDownloader
+        self.downloader = FileDownloader(self)
+        self.downloader.start()
 
     def start(self, host=None, port=None, debug=False, quiet=False):
         """ Starts the application. """

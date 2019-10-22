@@ -15,7 +15,7 @@ import sys
 
 from bottle import Bottle, static_file, template, request
 from taco.constants import GB, API_ERROR, API_OK
-from taco.apis import post_routes
+from taco.apis import post_routes, handle_api_call
 from taco.filesystem import get_windows_root_directories
 from taco.utils import norm_join, ShutDownException
 
@@ -81,25 +81,7 @@ def create_bottle(app):
 
     @result.post('/api.post')
     def post_index():
-        jdata = request.json
-        try:
-            api_call = jdata
-        except (SystemExit, KeyboardInterrupt):
-            raise
-        except Exception:
-            return "0"
-        if not "action" in jdata:
-            return "0"
-        if not "data" in jdata:
-            return "0"
-
-        action = jdata[u"action"]
-        if action in post_routes:
-            result = post_routes[action](jdata, app)
-            return result
-
-        logger.error("action %s is not part of post routes", action)
-        return "-1"
+        return handle_api_call(app, request.json)
 
     @result.route('/browselocaldirs/')
     @result.route('/browselocaldirs/<browse_path:path>')

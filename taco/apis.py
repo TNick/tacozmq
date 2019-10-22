@@ -16,10 +16,11 @@ import json
 import sys
 from collections import defaultdict
 
+from taco.filesystem.file_request import FileRequest
 from taco.globals import TacoApp
 from taco.constants import (
-    FILESYSTEM_WORKINPROGRESS_SUFFIX, TRACE, API_ERROR, PRIORITY_MEDIUM
-)
+    FILESYSTEM_WORKINPROGRESS_SUFFIX, TRACE, API_ERROR, PRIORITY_MEDIUM,
+    API_OK)
 
 logger = logging.getLogger('tacozmq.apis')
 if sys.version_info > (3, 0):
@@ -28,6 +29,32 @@ if sys.version_info > (3, 0):
 
 # This is where we collect all paths.
 post_routes = {}
+
+
+def handle_api_call(app, jdata):
+    """ Handles an api request. """
+    try:
+        action = jdata["action"]
+    except KeyError:
+        return error_result("~generic~", "Required parameter missing")
+
+    try:
+        api_call = post_routes[action]
+    except KeyError:
+        return error_result(
+            action,
+            "action %r is not part of post routes" % action)
+
+    try:
+        result = api_call(jdata, app)
+        return result
+    except (SystemExit, KeyError):
+        raise
+    except Exception:
+        logger.exception("exception while processing api call")
+        return error_result(action,
+                            "exception while processing api call; "
+                            "details in server logs")
 
 
 def post_route(action):
@@ -49,6 +76,14 @@ def post_route(action):
         return wrapped_f
 
     return wrap
+
+
+def error_result(path, message):
+    logger.error("%s request failed (%s)", path, message)
+    return {
+        "result": API_ERROR,
+        "message": message
+    }
 
 
 @post_route("apistatus")
@@ -89,31 +124,57 @@ def speed(jdata, app):
     return [up, down]
 
 
+@post_route("download_file")
+def download_file(jdata, app):
+    """ A file has been requested for download from a peer. """
+    while True:
+        try:
+            peer_id = jdata["peer"]
+            fake_path = jdata['path']
+        except (KeyError, ValueError, TypeError):
+            message = "Invalid parameters"
+            logger.exception(message)
+            break
+
+        # Create request and add it to queue.
+        request = app.add_download(peer_id=peer_id, fake_path=fake_path)
+        app.add_to_output_queue(
+            peer_id, app.commands.request_start_file_download_cmd(request),
+            PRIORITY_MEDIUM)
+
+        return {
+            "result": API_OK,
+            "download_id": request.key
+        }
+
+    return error_result("download_file", message)
+
+
 @post_route("downloadqadd")
 def download_q_add(jdata, app):
-    if isinstance(jdata["data"], dict):
-        try:
-            peer_uuid = jdata["data"]["uuid"]
-            sharedir = jdata["data"]["sharedir"]
-            filename = jdata["data"]["filename"]
-            filesize = int(jdata["data"]["filesize"])
-            filemod = float(jdata["data"]["filemodtime"])
-        except (SystemExit, KeyboardInterrupt):
-            raise
-        except Exception:
-            return -1
+    try:
+        peer_uuid = jdata["data"]["uuid"]
+        sharedir = jdata["data"]["sharedir"]
+        filename = jdata["data"]["filename"]
+        filesize = int(jdata["data"]["filesize"])
+        filemod = float(jdata["data"]["filemodtime"])
+    except (KeyError, ValueError, TypeError):
+        return -1
 
-        with app.download_q_lock:
-            logging.debug("Adding File to Download Q:" + str(
-                (peer_uuid, sharedir, filename, filesize, filemod)))
-            if peer_uuid not in app.download_q:
-                app.download_q[peer_uuid] = []
-            if (sharedir, filename, filesize, filemod) \
-                    not in app.download_q[peer_uuid]:
-                app.download_q[peer_uuid].append(
-                    (sharedir, filename, filesize, filemod))
-                return 1
-            return 2
+    with app.download_q_lock:
+        logging.debug(
+            "Adding file to download queue: "
+            "peer_uuid=%r, sharedir=%r, filename=%r, "
+            "filesize=%r, filemod=%r" % (
+                peer_uuid, sharedir, filename, filesize, filemod))
+        if peer_uuid not in app.download_q:
+            app.download_q[peer_uuid] = []
+        if (sharedir, filename, filesize, filemod) \
+                not in app.download_q[peer_uuid]:
+            app.download_q[peer_uuid].append(
+                (sharedir, filename, filesize, filemod))
+            return 1
+        return 2
 
 
 @post_route("downloadqremove")

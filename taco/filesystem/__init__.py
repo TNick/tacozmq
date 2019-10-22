@@ -164,13 +164,14 @@ def convert_path_to_share(app, share):
             if share_name == share:
                 return_val = share_path
                 break
+
     # logger.debug(share + " -- " + str(return_val))
     return return_val
 
 
 class TacoFilesystemManager(TacoThread):
     def __init__(self, app):
-        super(TacoFilesystemManager, self).__init__("thTacoFS")
+        super(TacoFilesystemManager, self).__init__(app, name="thTacoFS")
 
         self.sleep = threading.Event()
 

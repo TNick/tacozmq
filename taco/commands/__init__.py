@@ -8,6 +8,7 @@ from __future__ import print_function
 from umsgpack import packb, unpackb
 import logging
 
+from taco.commands.start_file_download import StartFileDownload
 from ..constants import *
 from .certs import Certs
 from .chat import Chat
@@ -22,7 +23,7 @@ logger = logging.getLogger('tacozmq.cmd')
 
 class TacoCommands(
         Certs, Chat, GetFileChunk, GiveFileChunk, RollCall,
-        ShareListing, SharelResult):
+        ShareListing, SharelResult, StartFileDownload):
     """
     The class host - for each exchange - the means to create the request
     on the client side, to create the reply on
@@ -47,6 +48,8 @@ class TacoCommands(
                 TacoCommands.reply_get_file_chunk_cmd,
             NET_REQUEST_GIVE_FILE_CHUNK:
                 TacoCommands.reply_give_file_chunk_cmd,
+            NET_REQUEST_START_DOWNLOAD:
+                TacoCommands.reply_start_file_download_cmd,
         }
         # for use in process_reply()
         self.reply_map = {
@@ -58,6 +61,8 @@ class TacoCommands(
                 TacoCommands.process_reply_get_file_chunk,
             NET_REPLY_SHARE_LISTING:
                 TacoCommands.process_share_listing_cmd,
+            NET_REPLY_START_DOWNLOAD:
+                TacoCommands.process_reply_start_file_download,
         }
 
     def create_request(self, command=NET_GARBAGE, data=None):
