@@ -98,7 +98,9 @@ def download_q_add(jdata, app):
             filename = jdata["data"]["filename"]
             filesize = int(jdata["data"]["filesize"])
             filemod = float(jdata["data"]["filemodtime"])
-        except:
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
             return -1
 
         with app.download_q_lock:
@@ -124,7 +126,9 @@ def download_q_remove(jdata, app):
             filename = data["filename"]
             filesize = int(data["filesize"])
             filemod = float(data["filemodtime"])
-        except:
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
             return -1
 
         with app.download_q_lock:
@@ -227,7 +231,9 @@ def completed_q_get(jdata, app):
                     peerinfo[peer_uuid] = [
                         app.settings["Peers"][peer_uuid]["nickname"],
                         app.settings["Peers"][peer_uuid]["localnick"]]
-                except:
+                except (SystemExit, KeyboardInterrupt):
+                    raise
+                except Exception:
                     peerinfo[peer_uuid] = ["Unknown Nickname", ""]
             output = {"result": app.completed_q[::-1], "peerinfo": peerinfo}
     return output
@@ -323,7 +329,9 @@ def peer_status(jdata, app):
                 timediffout = abs(time.time() - outgoing)
                 try:
                     nickname_status = app.settings["Peers"][peer_uuid]["nickname"]
-                except:
+                except (SystemExit, KeyboardInterrupt):
+                    raise
+                except Exception:
                     nickname_status = "Unknown"
                 output[peer_uuid] = [
                     incoming, outgoing, timediffinc, timediffout, nickname_status,

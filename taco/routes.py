@@ -84,7 +84,9 @@ def create_bottle(app):
         jdata = request.json
         try:
             api_call = jdata
-        except:
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
             return "0"
         if not "action" in jdata:
             return "0"
