@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Intermediates the access to the file sysstem for our app.
+Intermediates the access to the file system for our app.
 """
 from __future__ import unicode_literals
 from __future__ import print_function
@@ -192,7 +192,13 @@ class TacoFilesystemManager(threading.Thread):
         self.results_to_return = []
 
         self.download_q_check_time = time.time()
+
+        # Each key is a peer uuid. Entries can consist of either a single 0
+        # or a tuple of (sharedir, filename, filesize, filemod).
+        # This tells that we can only download a single file from a
+        # peer at any given time, the same as the first one in app.download_q
         self.client_downloading = {}
+
         self.client_downloading_status = {}
         self.client_downloading_pending_chunks = {}
         self.client_downloading_requested_chunks = {}
@@ -264,7 +270,7 @@ class TacoFilesystemManager(threading.Thread):
 
         if \
                 abs(time.time() - incoming) > ROLLCALL_TIMEOUT or \
-                        abs(time.time() - outgoing) > ROLLCALL_TIMEOUT:
+                abs(time.time() - outgoing) > ROLLCALL_TIMEOUT:
             self.set_status(
                 "I have items in the download queue, "
                 "but client has timed out rollcalls: %r", peer_uuid)
@@ -284,7 +290,7 @@ class TacoFilesystemManager(threading.Thread):
 
         (share_dir, file_name, file_size, file_mod) = \
             self.app.download_q[peer_uuid][0]
-        if not peer_uuid in self.client_downloading:
+        if peer_uuid not in self.client_downloading:
             self.client_downloading[peer_uuid] = 0
 
         if self.client_downloading[peer_uuid] != (share_dir, file_name, file_size, file_mod):
@@ -293,7 +299,8 @@ class TacoFilesystemManager(threading.Thread):
                 "peer_uuid=%r, share_dir=%r, file_name=%r, "
                 "file_size=%r, file_mod=%r" % (
                     peer_uuid, share_dir, file_name, file_size, file_mod))
-            self.client_downloading[peer_uuid] = (share_dir, file_name, file_size, file_mod)
+            self.client_downloading[peer_uuid] = (
+                share_dir, file_name, file_size, file_mod)
             self.client_downloading_pending_chunks[peer_uuid] = []
             self.client_downloading_requested_chunks[peer_uuid] = []
             if not os.path.isdir(local_copy_download_directory):
@@ -323,6 +330,7 @@ class TacoFilesystemManager(threading.Thread):
                 self.client_downloading_pending_chunks[peer_uuid].reverse()
                 self.set_status("Building in memory 'torrent' -- done")
         else:
+            # Download in progress.
             if not os.path.isdir(local_copy_download_directory):
                 # TODO: just ignoring this doesn't seem right
                 return

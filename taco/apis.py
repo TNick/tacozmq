@@ -91,20 +91,20 @@ def speed(jdata, app):
 
 @post_route("downloadqadd")
 def download_q_add(jdata, app):
-    if isinstance(jdata[u"data"], dict):
+    if isinstance(jdata["data"], dict):
         try:
-            peer_uuid = jdata[u"data"][u"uuid"]
-            sharedir = jdata[u"data"][u"sharedir"]
-            filename = jdata[u"data"][u"filename"]
-            filesize = int(jdata[u"data"][u"filesize"])
-            filemod = float(jdata[u"data"][u"filemodtime"])
+            peer_uuid = jdata["data"]["uuid"]
+            sharedir = jdata["data"]["sharedir"]
+            filename = jdata["data"]["filename"]
+            filesize = int(jdata["data"]["filesize"])
+            filemod = float(jdata["data"]["filemodtime"])
         except:
             return -1
 
         with app.download_q_lock:
             logging.debug("Adding File to Download Q:" + str(
                 (peer_uuid, sharedir, filename, filesize, filemod)))
-            if not peer_uuid in app.download_q:
+            if peer_uuid not in app.download_q:
                 app.download_q[peer_uuid] = []
             if (sharedir, filename, filesize, filemod) \
                     not in app.download_q[peer_uuid]:
@@ -116,14 +116,14 @@ def download_q_add(jdata, app):
 
 @post_route("downloadqremove")
 def download_q_remove(jdata, app):
-    data = jdata[u"data"]
+    data = jdata["data"]
     if isinstance(data, dict):
         try:
-            peer_uuid = data[u"uuid"]
-            sharedir = data[u"sharedir"]
-            filename = data[u"filename"]
-            filesize = int(data[u"filesize"])
-            filemod = float(data[u"filemodtime"])
+            peer_uuid = data["uuid"]
+            sharedir = data["sharedir"]
+            filename = data["filename"]
+            filesize = int(data["filesize"])
+            filemod = float(data["filemodtime"])
         except:
             return -1
 
@@ -144,15 +144,15 @@ def download_q_remove(jdata, app):
 
 @post_route("downloadqmove")
 def download_q_move(jdata, app):
-    data = jdata[u"data"]
+    data = jdata["data"]
     if isinstance(data, dict):
         try:
-            peer_uuid = data[u"uuid"]
-            sharedir = data[u"sharedir"]
-            filename = data[u"filename"]
-            filesize = int(data[u"filesize"])
-            filemod = float(data[u"filemodtime"])
-            newloc = int(data[u"newloc"])
+            peer_uuid = data["uuid"]
+            sharedir = data["sharedir"]
+            filename = data["filename"]
+            filesize = int(data["filesize"])
+            filemod = float(data["filemodtime"])
+            newloc = int(data["newloc"])
         except Exception:
             return -1
     else:
@@ -180,23 +180,24 @@ def download_q_get(jdata, app):
         local_copy_download_directory = os.path.normpath(app.settings["Download Location"])
         with app.download_q_lock:
             peerinfo = {}
-            fileinfo = defaultdict(dict)
             for peer_uuid in app.settings["Peers"]:
                 try:
                     peerinfo[peer_uuid] = [
                         app.settings["Peers"][peer_uuid]["nickname"],
                         app.settings["Peers"][peer_uuid]["localnick"]]
-                except:
-                    peerinfo[peer_uuid] = [u"Unknown Nickname", u""]
+                except KeyError:
+                    peerinfo[peer_uuid] = ["Unknown Nickname", ""]
+
+            fileinfo = defaultdict(dict)
             for peer_uuid in app.download_q:
                 for (sharedir, filename, filesize, modtime) \
                         in app.download_q[peer_uuid]:
                     filename_incomplete = os.path.normpath(os.path.join(
                         local_copy_download_directory,
                         filename + FILESYSTEM_WORKINPROGRESS_SUFFIX))
-                    try:
+                    if os.path.isfile(filename_incomplete):
                         current_size = os.path.getsize(filename_incomplete)
-                    except:
+                    else:
                         current_size = 0
                     fileinfo[peer_uuid][filename] = current_size
             output = {
@@ -225,7 +226,7 @@ def completed_q_get(jdata, app):
                         app.settings["Peers"][peer_uuid]["nickname"],
                         app.settings["Peers"][peer_uuid]["localnick"]]
                 except:
-                    peerinfo[peer_uuid] = [u"Unknown Nickname", u""]
+                    peerinfo[peer_uuid] = ["Unknown Nickname", ""]
             output = {"result": app.completed_q[::-1], "peerinfo": peerinfo}
     return output
 
@@ -330,7 +331,7 @@ def peer_status(jdata, app):
 
 @post_route("settingssave")
 def settings_save(jdata, app):
-    data = jdata[u"data"]
+    data = jdata["data"]
     if isinstance(data, list):
         if len(data) >= 0:
             with app.settings_lock:
@@ -344,7 +345,7 @@ def settings_save(jdata, app):
 
 @post_route("sharesave")
 def share_save(jdata, app):
-    data = jdata[u"data"]
+    data = jdata["data"]
     if isinstance(data, list):
         if len(data) >= 0:
             with app.settings_lock:
@@ -380,7 +381,7 @@ def get_chat(jdata, app):
 
 @post_route("sendchat")
 def send_chat(jdata, app):
-    data = jdata[u"data"]
+    data = jdata["data"]
     if isinstance(data, str) or isinstance(data, unicode):
         if len(data) > 0:
             TacoApp.instance.commands.request_chat_cmd(data)
@@ -396,7 +397,7 @@ def chat_uuid(jdata, app):
 
 @post_route("peersave")
 def peer_save(jdata, app):
-    data = jdata[u"data"]
+    data = jdata["data"]
     if isinstance(data, list):
         if len(data) >= 0:
             with app.settings_lock:

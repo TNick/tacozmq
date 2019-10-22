@@ -64,6 +64,7 @@ function add_to_queue_click(event) {
     dataType: "json",
     error: API_Alert,
     success: function (data) {
+      console.log(`add_to_queue_click result = ${data}`)
       if (data == 1) {
         buttonthis.find("span").toggleClass("spinner glyphicon-refresh glyphicon-ok");
         buttonthis.unbind("click");

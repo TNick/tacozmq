@@ -51,6 +51,10 @@ class TacoApp(object):
     share_listings = {}
     share_listings_lock = threading.Lock()
 
+    # This is where requests for download are placed by the API.
+    # Each entry is a tuple consisting of
+    #    (sharedir, filename, filesize, filemodtime).
+    # The filesystem module takes entries out (peer_q_download).
     download_q = {}
     download_q_lock = threading.Lock()
 
