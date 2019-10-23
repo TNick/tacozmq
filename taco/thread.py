@@ -86,7 +86,7 @@ class TacoSleepThread(TacoThread):
         Event that prevents the runner from sleeping.
     """
     def __init__(self, app, name, sleep_time=0.2):
-        super().__init__(self, name=name)
+        super().__init__(app=app, name=name)
         self.sleep = threading.Event()
         self.sleep_time = sleep_time
 

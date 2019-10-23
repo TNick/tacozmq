@@ -13,7 +13,7 @@ import logging
 from ..filesystem.file_request import FileRequestHandler, FileRequest
 from ..constants import *
 
-logger = logging.getLogger('tacozmq.cmd')
+logger = logging.getLogger('tacozmq.cmd.file')
 
 
 class StartFileDownload(object):

@@ -44,6 +44,10 @@ class DownloadManager(object):
         self.uploads = {}
         self.uploading_peers = {}
 
+        # Actual file transfer.
+        self.upload_chunk_lock = threading.Lock()
+        self.download_chunk_lock = threading.Lock()
+
     def add_download(self, peer_id, fake_path):
         """
         Adds a single file to download queue.

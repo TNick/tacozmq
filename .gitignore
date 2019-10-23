@@ -3,6 +3,7 @@
 *.swp
 keys/*
 certstore/*
+downloads/*
 *.txt
 zmq/*
 .idea/*

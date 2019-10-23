@@ -65,8 +65,12 @@ class StateOfTransferMixin(object):
         self.transfer_state = TRANSFER_INIT
 
     @property
+    def initial_state(self):
+        return self.transfer_state == TRANSFER_INIT
+
+    @property
     def acknowledged(self):
-        return self.transfer_state != TRANSFER_INIT
+        return self.transfer_state == TRANSFER_ACK
 
     @acknowledged.setter
     def acknowledged(self, value=True):
